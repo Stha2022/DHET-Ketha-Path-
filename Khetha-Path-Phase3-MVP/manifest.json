@@ -1,9 +1,0 @@
-{
-  "name": "Khetha Path",
-  "short_name": "Khetha",
-  "start_url": "index.php",
-  "display": "standalone",
-  "background_color": "#f5faf9",
-  "theme_color": "#102a43",
-  "icons": []
-}
