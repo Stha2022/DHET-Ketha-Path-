@@ -1,0 +1,18 @@
+{
+  "name": "Khetha Path \u2014 Career Guidance Companion",
+  "short_name": "Khetha Path",
+  "start_url": "index.php",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#102a43",
+  "theme_color": "#102a43",
+  "description": "A mobile-first career guidance journey inspired by NCAP.",
+  "icons": [
+    {
+      "src": "assets/images/khetha-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
