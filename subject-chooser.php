@@ -1,5 +1,9 @@
 <?php
 session_start();
+if (empty($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
 require_once __DIR__ . '/subject-choice-data.php';
 
 $types = sc_questionnaire_types();
@@ -15,7 +19,7 @@ $allDone = $completedCount === count($types);
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Subject Choice — Khetha Path</title>
+<title>Subject Chooser — Khetha Path</title>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -25,7 +29,8 @@ $allDone = $completedCount === count($types);
   <main class="dashboard narrow">
     <div class="welcome-row">
       <div>
-        <h1>Subject Choice</h1>
+        <p class="eyebrow">NCAP-ALIGNED TOOL</p>
+        <h1>Subject Chooser</h1>
         <p class="muted">NCAP's Self Exploration questionnaires help you understand what study fields could suit you. Complete all three below to unlock your combined report.</p>
       </div>
     </div>
@@ -84,6 +89,8 @@ $allDone = $completedCount === count($types);
         <button type="submit" class="ghost-btn" style="color:#c0392b;border-color:#f3c9c2">Reset assessment (clear all 3 questionnaires)</button>
       </form>
     <?php endif; ?>
+
+    <a href="dashboard.php" class="ghost-btn" style="display:inline-block;margin-top:18px">← Back to dashboard</a>
   </main>
 </div>
 </body>

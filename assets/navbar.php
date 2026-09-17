@@ -1,17 +1,14 @@
 <?php
 // Shared top navbar — include once, right after <body> opens, in place of
-// a page's own <header class="topbar">...</header>.
-// Mocked profile only: no auth/accounts exist yet, so the name/avatar are
-// just a placeholder and the dropdown links aren't wired to anything.
-$kp_name = $_SESSION['profile']['name'] ?? 'Lindi';
+// a page's own <header class="topbar">...</header>. Include only on pages
+// that already guard on $_SESSION['user'] (login.php redirects otherwise).
+$kp_name = $_SESSION['user']['name'] ?? 'there';
 $kp_initial = strtoupper(substr($kp_name, 0, 1));
 ?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
 .kp-navbar{height:72px;background:#fff;border-bottom:1px solid var(--line,#dbe7ea);padding:0 5%}
 .kp-navbar .kp-brand{font-size:20px;font-weight:600;color:var(--ink,#172b4d)}
-.kp-navbar .kp-brand b{color:var(--teal,#00a99d)}
-.kp-navbar .kp-brand-mark{width:38px;height:38px;display:grid;place-items:center;background:var(--navy,#102a43);color:#fff;font-weight:800;border-radius:12px}
 .kp-profile-btn{border:1px solid var(--line,#dbe7ea);background:#fff;border-radius:999px;padding:6px 14px 6px 6px}
 .kp-profile-btn:hover,.kp-profile-btn:focus{background:var(--mint,#e7f8f5);border-color:var(--teal,#00a99d)}
 .kp-profile-btn:after{margin-left:10px}
@@ -28,8 +25,8 @@ $kp_initial = strtoupper(substr($kp_name, 0, 1));
 </style>
 
 <nav class="navbar kp-navbar d-flex align-items-center justify-content-between">
-  <a class="navbar-brand kp-brand d-flex align-items-center gap-2 m-0" href="index.php">
-    <span class="kp-brand-mark">K</span> Khetha<b>Path</b>
+  <a class="navbar-brand kp-brand d-flex align-items-center gap-2 m-0" href="dashboard.php">
+    <img class="khetha-logo small-logo" src="assets/images/khetha-logo.png" alt="Khetha">
   </a>
 
   <div class="dropdown">
@@ -48,7 +45,7 @@ $kp_initial = strtoupper(substr($kp_name, 0, 1));
         </form>
       </li>
       <li><hr class="dropdown-divider"></li>
-      <li><a class="dropdown-item text-danger" href="#">Log out</a></li>
+      <li><a class="dropdown-item text-danger" href="logout.php">Log out</a></li>
     </ul>
   </div>
 </nav>

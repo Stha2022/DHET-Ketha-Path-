@@ -1,10 +1,14 @@
 <?php
 session_start();
+if (empty($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
 require_once __DIR__ . '/subject-choice-data.php';
 
 $type = $_GET['type'] ?? $_POST['type'] ?? '';
 if (!sc_is_valid_type($type)) {
-    header('Location: subject-choice.php');
+    header('Location: subject-chooser.php');
     exit;
 }
 
@@ -79,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endforeach; ?>
 
       <div class="wizard-nav">
-        <a class="ghost-btn" href="subject-choice.php">Back</a>
+        <a class="ghost-btn" href="subject-chooser.php">Back</a>
         <button type="submit" class="primary-btn">See my results</button>
       </div>
     </form>

@@ -1,12 +1,16 @@
 <?php
 session_start();
+if (empty($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
 require_once __DIR__ . '/subject-choice-data.php';
 
 $types = sc_questionnaire_types();
 $done  = $_SESSION['subject_choice']['done'] ?? [];
 foreach (array_keys($types) as $t) {
     if (empty($done[$t])) {
-        header('Location: subject-choice.php');
+        header('Location: subject-chooser.php');
         exit;
     }
 }
@@ -88,7 +92,7 @@ $top3       = sc_combined_report($allAnswers);
       </div>
     </div>
 
-    <a href="subject-choice.php" class="ghost-btn" style="display:inline-block;margin-top:22px">Back to Subject Choice</a>
+    <a href="subject-chooser.php" class="ghost-btn" style="display:inline-block;margin-top:22px">Back to Subject Choice</a>
   </main>
 </div>
 </body>

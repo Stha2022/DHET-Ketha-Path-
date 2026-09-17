@@ -1,1 +1,98 @@
-document.addEventListener('DOMContentLoaded',()=>{const wf=document.getElementById('welcomeForm');const name=document.getElementById('name');const follow=document.getElementById('followup');let selected=[];if(wf){wf.addEventListener('submit',e=>{e.preventDefault();const n=name.value.trim();document.getElementById('greeting').textContent=`Hi ${n}! 👋`;document.querySelector('#followup p').textContent="Great to meet you. What subjects are you currently taking?";document.getElementById('personalGreeting').textContent=`Let's build your path, ${n}.`;follow.classList.remove('hidden');wf.classList.add('hidden');});document.querySelectorAll('[data-sub]').forEach(b=>b.addEventListener('click',()=>{b.classList.toggle('selected');const s=b.dataset.sub;if(selected.includes(s))selected=selected.filter(x=>x!==s);else selected.push(s);document.getElementById('continueBtn').classList.toggle('hidden',selected.length===0)}));document.getElementById('continueBtn').addEventListener('click',()=>{sessionStorage.setItem('khetha_name',name.value);sessionStorage.setItem('khetha_subjects',JSON.stringify(selected));location.href='subject-choice.php';});}});
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("askForm");
+  if (form) form.addEventListener("submit", e => {
+    e.preventDefault();
+    const input = document.getElementById("question");
+    if (input.value.trim()) ask(input.value.trim());
+  });
+
+  document.querySelectorAll(".scenario").forEach(btn => {
+    btn.addEventListener("click", () => adaptPath(btn.dataset.scenario));
+  });
+
+  updateNetworkStatus();
+});
+
+function addMessage(text, type="ai", tag="") {
+  const box = document.getElementById("messages");
+  if (!box) return;
+  const div = document.createElement("div");
+  div.className = "bubble " + type;
+  div.innerHTML = (tag ? `<small class="message-tag">${tag}</small>` : "") + escapeHtml(text).replace(/\n/g,"<br>");
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function ask(question) {
+  const input = document.getElementById("question");
+  addMessage(question, "user");
+  if (input) input.value = "";
+  fetch("ask.php", {
+    method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:"question="+encodeURIComponent(question)
+  }).then(r=>r.json()).then(data => addMessage(data.answer, "ai", data.tag))
+    .catch(() => addMessage("You appear to be offline. Your saved journey still works, but this live companion response needs a connection."));
+}
+
+function adaptPath(scenario) {
+  const result = document.getElementById("adapterResult");
+  const title = document.getElementById("resultTitle");
+  const text = document.getElementById("resultText");
+  const cards = document.getElementById("routeCards");
+  if (!result) return;
+
+  const data = {
+    notqualify: {
+      title:"Your goal can have more than one route.",
+      text:"Instead of stopping at the first requirement, Khetha can help you compare adjacent qualifications and progression routes that continue toward a related career goal.",
+      routes:["Alternative qualification route","Related career route","Progression / bridging route"]
+    },
+    subjects: {
+      title:"Your pathway changes with your subjects.",
+      text:"Khetha can flag where subject requirements matter, then guide you toward routes that fit your updated subject profile rather than showing you the same list.",
+      routes:["Re-check subject requirements","Explore compatible qualifications","Review related careers"]
+    },
+    connectivity: {
+      title:"Your journey should not disappear when your data does.",
+      text:"The mobile experience can keep key pathway information, saved careers and next actions available offline, then sync when connectivity returns.",
+      routes:["Saved journey offline","Low-data content mode","Sync when connected"]
+    },
+    provider: {
+      title:"You can compare study routes.",
+      text:"Khetha can keep the career goal fixed while allowing the learner to compare different qualification and provider options.",
+      routes:["Compare qualifications","Compare providers","Save a preferred route"]
+    }
+  }[scenario];
+
+  title.textContent = data.title;
+  text.textContent = data.text;
+  cards.innerHTML = data.routes.map((r,i)=>`<div class="route-card"><b>0${i+1}</b><span>${escapeHtml(r)}</span><em>Explore →</em></div>`).join("");
+  result.classList.remove("hidden");
+  result.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function markComplete(button) {
+  button.textContent = "Explored ✓";
+  button.classList.add("completed");
+}
+
+function updateNetworkStatus() {
+  const el = document.getElementById("networkStatus");
+  if (!el) return;
+  const update = () => {
+    el.textContent = navigator.onLine ? "● Connected" : "● Offline mode";
+    el.classList.toggle("offline", !navigator.onLine);
+  };
+  update();
+  window.addEventListener("online", update);
+  window.addEventListener("offline", update);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js").catch(()=>{}));
+}

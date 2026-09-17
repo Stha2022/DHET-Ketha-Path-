@@ -1,10 +1,14 @@
 <?php
 session_start();
+if (empty($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
 require_once __DIR__ . '/subject-choice-data.php';
 
 $type = $_GET['type'] ?? '';
 if (!sc_is_valid_type($type) || empty($_SESSION['subject_choice']['done'][$type])) {
-    header('Location: subject-choice.php');
+    header('Location: subject-chooser.php');
     exit;
 }
 
@@ -69,7 +73,7 @@ $allDone = $nextType === null;
     </div>
 
     <div class="wizard-nav" style="max-width:640px;margin:26px auto 0">
-      <a class="ghost-btn" href="subject-choice.php">Back to hub</a>
+      <a class="ghost-btn" href="subject-chooser.php">Back to hub</a>
       <?php if ($allDone): ?>
         <a class="primary-btn" href="subject-choice-report.php">View combined report</a>
       <?php else: ?>

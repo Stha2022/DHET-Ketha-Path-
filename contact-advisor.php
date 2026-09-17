@@ -1,5 +1,9 @@
 <?php
 session_start();
+if (empty($_SESSION['user'])) {
+    header('Location: login.php');
+    exit;
+}
 
 $topics = [
     'subject_choice' => 'Subject Choice',
@@ -54,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <div><small>REQUEST SENT</small><h2>Thanks — your request is in.</h2></div>
         </div>
         <p class="muted">A Career Advisor will be in touch about <b><?= htmlspecialchars($topics[$old['topic']]) ?></b><?= $old['note'] !== '' ? '. Your note has been included.' : '.' ?></p>
-        <a class="ghost-btn" href="subject-choice.php" style="display:inline-block;margin-top:16px">Back to Subject Choice</a>
+        <a class="ghost-btn" href="dashboard.php" style="display:inline-block;margin-top:16px">Back to dashboard</a>
       </section>
     <?php else: ?>
       <form class="wizard-panel" method="post" action="contact-advisor.php" style="max-width:560px">
@@ -73,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <textarea name="note" rows="4" placeholder="e.g. I'm torn between two study fields..." style="width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:12px;font:inherit;outline:none;resize:vertical"><?= htmlspecialchars($old['note'] ?? '') ?></textarea>
         </div>
         <div class="wizard-nav">
-          <a class="ghost-btn" href="subject-choice.php">Cancel</a>
+          <a class="ghost-btn" href="dashboard.php">Cancel</a>
           <button type="submit" class="primary-btn">Send request</button>
         </div>
       </form>
