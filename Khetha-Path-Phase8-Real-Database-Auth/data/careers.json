@@ -1,0 +1,41 @@
+{
+  "notice": "PROTOTYPE DATA ONLY \u2014 replace with approved NCAP/DHET data in production.",
+  "careers": [
+    {
+      "name": "Software Development",
+      "subjects": [
+        "Mathematics",
+        "IT"
+      ],
+      "next": [
+        "Explore qualifications",
+        "Compare providers",
+        "Explore opportunities"
+      ]
+    },
+    {
+      "name": "Cybersecurity",
+      "subjects": [
+        "Mathematics",
+        "IT"
+      ],
+      "next": [
+        "Explore qualifications",
+        "Compare providers",
+        "Explore opportunities"
+      ]
+    },
+    {
+      "name": "Data Analytics",
+      "subjects": [
+        "Mathematics",
+        "IT"
+      ],
+      "next": [
+        "Explore qualifications",
+        "Compare providers",
+        "Explore opportunities"
+      ]
+    }
+  ]
+}

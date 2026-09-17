@@ -1,0 +1,175 @@
+<?php
+session_start();
+require_once __DIR__ . '/config/db.php';
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name     = trim($_POST['name'] ?? '');
+    $email    = strtolower(trim($_POST['email'] ?? ''));
+    $password = $_POST['password'] ?? '';
+    $grade    = trim($_POST['grade'] ?? '');
+    $subjects = $_POST['subjects'] ?? [];
+    $interest = trim($_POST['interest'] ?? '');
+    $consent  = isset($_POST['consent']);
+
+    if (!$name || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 8 || !$grade || !is_array($subjects) || count($subjects) === 0 || !$consent) {
+        $error = 'Please complete all required fields, select at least one subject and accept the consent statement.';
+    } else {
+        try {
+            $check = $pdo->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+            $check->execute([$email]);
+
+            if ($check->fetch()) {
+                $error = 'An account with this email already exists. Please sign in.';
+            } else {
+                $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+                $consentAt = date('Y-m-d H:i:s');
+
+                $pdo->beginTransaction();
+
+                $stmt = $pdo->prepare(
+                    'INSERT INTO users (name, email, password_hash, grade, consent_at)
+                     VALUES (?, ?, ?, ?, ?)'
+                );
+                $stmt->execute([$name, $email, $passwordHash, $grade, $consentAt]);
+
+                $userId = (int)$pdo->lastInsertId();
+
+                $assessment = $pdo->prepare(
+                    'INSERT INTO assessments (user_id, subjects, interests)
+                     VALUES (?, ?, ?)'
+                );
+                $assessment->execute([
+                    $userId,
+                    json_encode(array_values($subjects), JSON_UNESCAPED_UNICODE),
+                    $interest
+                ]);
+
+                $journey = $pdo->prepare(
+                    'INSERT INTO journey_events (user_id, event_type, event_data)
+                     VALUES (?, ?, ?)'
+                );
+                $journey->execute([
+                    $userId,
+                    'profile_created',
+                    json_encode([
+                        'grade' => $grade,
+                        'subjects_count' => count($subjects)
+                    ], JSON_UNESCAPED_UNICODE)
+                ]);
+
+                $pdo->commit();
+
+                session_regenerate_id(true);
+                $_SESSION['user'] = [
+                    'id' => $userId,
+                    'name' => $name,
+                    'email' => $email,
+                    'grade' => $grade,
+                    'subjects' => array_values($subjects),
+                    'interest' => $interest
+                ];
+                $_SESSION['name'] = $name;
+                $_SESSION['subjects'] = array_values($subjects);
+                $_SESSION['grade'] = $grade;
+                $_SESSION['interest'] = $interest;
+
+                header('Location: dashboard.php');
+                exit;
+            }
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('Khetha registration failed: ' . $e->getMessage());
+            $error = 'We could not create the account right now. Please check that MySQL is running and try again.';
+        }
+    }
+}
+?>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Create your Khetha profile</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="auth-page">
+<header class="topbar">
+  <a class="brand" href="index.php">
+    <img class="khetha-logo small-logo" src="assets/images/khetha-logo.png" alt="Khetha">
+  </a>
+  <span class="status-pill">Your journey starts here</span>
+</header>
+
+<main class="auth-layout">
+<section class="auth-intro">
+  <p class="eyebrow">CREATE YOUR KHETHA PROFILE</p>
+  <h1>Let’s make this personal.</h1>
+  <p class="lead">Your answers become the starting point for a personalised career journey.</p>
+  <div class="privacy-card">
+    <b>🔒 Your information matters.</b>
+    <p>Your password is protected with secure hashing. Your profile, assessment and journey data are linked to your Khetha user account.</p>
+  </div>
+</section>
+
+<section class="auth-card">
+  <div class="auth-progress"><span class="active">1</span><i></i><span>2</span><i></i><span>3</span></div>
+  <div class="step-label">CREATE ACCOUNT &nbsp; • &nbsp; PERSONALISE</div>
+
+  <?php if ($error): ?>
+    <div class="error-box"><?= htmlspecialchars($error) ?></div>
+  <?php endif; ?>
+
+  <form method="POST">
+    <label>Full name
+      <input name="name" required value="<?= htmlspecialchars($_POST['name'] ?? '') ?>" placeholder="e.g. Lindiwe Mokoena">
+    </label>
+
+    <label>Email
+      <input type="email" name="email" required value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" placeholder="you@example.com">
+    </label>
+
+    <label>Password
+      <input type="password" name="password" minlength="8" required placeholder="At least 8 characters">
+    </label>
+
+    <label>Current level
+      <select name="grade" required>
+        <option value="">Choose...</option>
+        <?php foreach (['Grade 9','Grade 10','Grade 11','Grade 12','Post-school'] as $g): ?>
+          <option <?= (($_POST['grade'] ?? '') === $g) ? 'selected' : '' ?>><?= $g ?></option>
+        <?php endforeach; ?>
+      </select>
+    </label>
+
+    <label>Subjects <small>Select all that apply</small></label>
+    <div class="subject-grid">
+      <?php foreach (['Mathematics','Mathematical Literacy','Physical Sciences','Life Sciences','IT','Computer Applications Technology','Accounting','Business Studies','Economics','Geography'] as $x): ?>
+        <label class="subject-choice">
+          <input type="checkbox" name="subjects[]" value="<?= htmlspecialchars($x) ?>">
+          <span><?= htmlspecialchars($x) ?></span>
+        </label>
+      <?php endforeach; ?>
+    </div>
+
+    <label>What are you interested in?
+      <small>This helps Khetha personalise your starting point.</small>
+      <textarea name="interest" rows="3" placeholder="e.g. technology, healthcare, business, design..."><?= htmlspecialchars($_POST['interest'] ?? '') ?></textarea>
+    </label>
+
+    <label class="consent-row">
+      <input type="checkbox" name="consent" value="1" required>
+      <span>I understand that my information will be used to personalise my Khetha journey.</span>
+    </label>
+
+    <button class="primary-btn" type="submit">Create My Khetha Profile →</button>
+  </form>
+
+  <p class="auth-switch">Already have an account? <a href="login.php">Sign in</a></p>
+</section>
+</main>
+</body>
+</html>
