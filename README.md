@@ -1,5 +1,22 @@
 # Khetha Path — GovTech 2026 Phase 3 MVP
 
+## ⚠️ You are on `render-demo` — a database-free branch
+
+This branch exists only to deploy a live, clickable demo (e.g. on Render) without needing MySQL set up anywhere. Compared to `main`:
+
+- `register.php` and `login.php` no longer touch a database — a profile lives only in the browser session for that visit. Register with any details, or sign in with any email/password (nothing is checked or stored), and you get a fresh demo session.
+- `config/db.php` and `db-test.php` are removed (nothing on this branch needs them).
+- A `Dockerfile` + `render.yaml` are included so Render can build and run this branch directly — see **Deploy on Render** below.
+
+**`main` still has the real MySQL-backed auth** (password hashing, `users`/`assessments`/`journey_events` tables) — that's the version to keep developing against locally with XAMPP. Don't merge `render-demo` back into `main`; it's a one-way deployment branch, cut from `main` and periodically re-cut when `main` moves forward.
+
+### Deploy on Render
+1. Push this branch to GitHub (already done if you're reading this on `render-demo`).
+2. On [render.com](https://render.com): **New → Web Service**, connect this repo, pick the `render-demo` branch.
+3. Render should auto-detect `render.yaml` (runtime: Docker). If asked manually: Environment = **Docker**, leave build/start commands blank (the `Dockerfile` handles it).
+4. Deploy. Render provides `$PORT` automatically — the `Dockerfile` listens on it via PHP's built-in server.
+5. Share the resulting `*.onrender.com` URL — anyone can register or "sign in" with any details to try the full flow, including the Subject Choice questionnaire.
+
 ## Core idea
 **NCAP tells you what is possible. Khetha Path helps you navigate how to get there.**
 

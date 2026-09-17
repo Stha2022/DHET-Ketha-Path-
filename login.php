@@ -1,6 +1,8 @@
 <?php
+// Demo mode: no database, so there's no real account to check against.
+// Any well-formed email + non-empty password signs in with a fresh demo
+// profile (name guessed from the email) — nothing is persisted.
 session_start();
-require_once __DIR__ . '/config/db.php';
 
 $error = '';
 
@@ -11,59 +13,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || !$password) {
         $error = 'Please enter your email and password.';
     } else {
-        try {
-            $stmt = $pdo->prepare(
-                'SELECT id, name, email, password_hash, grade
-                 FROM users WHERE email = ? LIMIT 1'
-            );
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
+        session_regenerate_id(true);
 
-            if (!$user || !password_verify($password, $user['password_hash'])) {
-                $error = 'The email or password is incorrect.';
-            } else {
-                $a = $pdo->prepare(
-                    'SELECT subjects, interests
-                     FROM assessments
-                     WHERE user_id = ?
-                     ORDER BY id DESC LIMIT 1'
-                );
-                $a->execute([$user['id']]);
-                $assessment = $a->fetch();
+        $guessedName = ucwords(str_replace(['.', '_', '+'], ' ', explode('@', $email)[0]));
 
-                session_regenerate_id(true);
+        $_SESSION['user'] = [
+            'id' => 1,
+            'name' => $guessedName,
+            'email' => $email,
+            'grade' => 'Grade 11',
+            'subjects' => [],
+            'interest' => ''
+        ];
+        $_SESSION['name'] = $guessedName;
+        $_SESSION['subjects'] = [];
+        $_SESSION['grade'] = 'Grade 11';
+        $_SESSION['interest'] = '';
 
-                $_SESSION['user'] = [
-                    'id' => (int)$user['id'],
-                    'name' => $user['name'],
-                    'email' => $user['email'],
-                    'grade' => $user['grade'],
-                    'subjects' => $assessment && $assessment['subjects'] ? (json_decode($assessment['subjects'], true) ?: []) : [],
-                    'interest' => $assessment['interests'] ?? ''
-                ];
-
-                $_SESSION['name'] = $user['name'];
-                $_SESSION['subjects'] = $_SESSION['user']['subjects'];
-                $_SESSION['grade'] = $user['grade'];
-                $_SESSION['interest'] = $_SESSION['user']['interest'];
-
-                $journey = $pdo->prepare(
-                    'INSERT INTO journey_events (user_id, event_type, event_data)
-                     VALUES (?, ?, ?)'
-                );
-                $journey->execute([
-                    $user['id'],
-                    'login',
-                    json_encode(['source' => 'web'], JSON_UNESCAPED_UNICODE)
-                ]);
-
-                header('Location: dashboard.php');
-                exit;
-            }
-        } catch (PDOException $e) {
-            error_log('Khetha login failed: ' . $e->getMessage());
-            $error = 'We could not connect to your account right now. Please check that MySQL is running.';
-        }
+        header('Location: dashboard.php');
+        exit;
     }
 }
 ?>
@@ -105,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <button class="primary-btn" type="submit">Continue My Journey →</button>
   </form>
 
-  <div class="demo-note">Your credentials are checked against the Khetha MySQL database. Passwords are never stored as plain text.</div>
+  <div class="demo-note">🧪 Demo mode — no database. Any email and password will sign you in with a fresh session; nothing is checked or stored. Prefer a personalised profile? <a href="register.php">Create one</a> instead.</div>
   <p class="auth-switch">New to Khetha? <a href="register.php">Create your profile</a></p>
 </section>
 </main>

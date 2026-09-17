@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: khetha-path-demo
+    runtime: docker
+    plan: free
+    branch: render-demo
+    envVars:
+      - key: PORT
+        value: 10000
