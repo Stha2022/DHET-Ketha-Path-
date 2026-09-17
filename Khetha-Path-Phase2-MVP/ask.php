@@ -1,6 +1,0 @@
-<?php session_start();header('Content-Type: application/json');$q=trim($_POST['question']??'');$name=$_SESSION['profile']['name']??'there';$answers=[
-'computer'=>"If you enjoy computers and problem-solving, you can explore Software Development, Cybersecurity and Data Analytics. Khetha can then help you compare the study pathways.",
-'maths'=>"Mathematics can connect to many technology, science, business and analytical pathways. Tell me what else you enjoy and I can narrow the options.",
-'qualify'=>"If you don't qualify for your first-choice route, don't assume the career is over. Use What If? to explore alternative study and progression pathways.",
-'career'=>"I can help you explore careers, qualifications, study providers and next steps. Start with your subjects and interests so your journey is more personalised."
-];$ans=$answers['career'];foreach($answers as $key=>$value){if(stripos($q,$key)!==false){$ans=$value;break;}}echo json_encode(['message'=>"Hi $name! ".$ans,'source'=>'Prototype response — production version will use approved NCAP/DHET sources.']);?>
