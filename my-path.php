@@ -1,9 +1,27 @@
 <?php
 session_start();
+require_once __DIR__ . '/assessment-relevance-data.php';
 $name = $_SESSION['name'] ?? 'Lindi';
 $subjects = $_SESSION['subjects'] ?? ['Mathematics','IT'];
 $interest = $_SESSION['interest'] ?? 'building apps';
 $grade = $_SESSION['grade'] ?? 'Grade 11';
+
+// Same interim done-signals dashboard.php uses (see its comment) —
+// job_fit isn't wired to a persistence signal yet, so it never reads done.
+$assessmentDone = [
+    AR_ASSESSMENT_SUBJECT_CHOOSER => isset($_SESSION['subject_tool']),
+    AR_ASSESSMENT_CAREER_CHOICE   => isset($_SESSION['career_quiz']),
+    AR_ASSESSMENT_JOB_FIT         => false,
+];
+$assessmentMeta = [
+    AR_ASSESSMENT_SUBJECT_CHOOSER => ['label' => 'Subject Chooser', 'href' => 'subject.php', 'desc' => 'See which subjects open or close your target careers.'],
+    AR_ASSESSMENT_CAREER_CHOICE   => ['label' => 'Career Choice', 'href' => 'career-quiz.php', 'desc' => 'A few minutes to find out what kind of work you\'re drawn to.'],
+    AR_ASSESSMENT_JOB_FIT         => ['label' => 'Job Fit', 'href' => 'occupation.php', 'desc' => 'Check whether you can actually do and sustain a specific role.'],
+];
+$nextAssessment = null;
+foreach (ar_ordered_assessments($grade) as $key) {
+    if (!$assessmentDone[$key]) { $nextAssessment = $assessmentMeta[$key]; break; }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -59,10 +77,16 @@ $grade = $_SESSION['grade'] ?? 'Grade 11';
 
 <section class="panel">
  <div class="panel-title"><span>◈</span><div><small>YOUR NEXT ACTION</small><h2>One step at a time</h2></div></div>
- <div class="next-card">
-   <span class="big-number">1</span><div><b>Compare qualification routes</b><p>See different study options that can lead toward your chosen career.</p></div>
- </div>
- <button class="secondary-btn" onclick="markComplete(this)">Mark as explored ✓</button>
+ <?php if ($nextAssessment): ?>
+   <a class="next-card" href="<?= htmlspecialchars($nextAssessment['href']) ?>" style="text-decoration:none;color:inherit;display:flex">
+     <span class="big-number">1</span><div><b><?= htmlspecialchars($nextAssessment['label']) ?></b><p><?= htmlspecialchars($nextAssessment['desc']) ?></p></div>
+   </a>
+ <?php else: ?>
+   <div class="next-card">
+     <span class="big-number">1</span><div><b>Compare qualification routes</b><p>All three assessments are in — see different study options that can lead toward your chosen career.</p></div>
+   </div>
+   <button class="secondary-btn" onclick="markComplete(this)">Mark as explored ✓</button>
+ <?php endif; ?>
  <div class="offline-card">📥 <b>Your journey can travel with you.</b><br><span>Saved journey content is available offline in the PWA prototype.</span></div>
 </section>
 </div>
