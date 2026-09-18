@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
 <title>Contact a Career Advisor — Khetha Path</title>
 <link rel="stylesheet" href="assets/css/style.css">
 </head>

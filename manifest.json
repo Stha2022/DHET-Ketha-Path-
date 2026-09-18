@@ -1,9 +1,17 @@
 {
   "name": "Khetha Path",
   "short_name": "Khetha",
+  "description": "Make the right choice. Decide your future.",
   "start_url": "index.php",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
+  "lang": "en-ZA",
   "background_color": "#f5faf9",
   "theme_color": "#102a43",
-  "icons": []
+  "icons": [
+    { "src": "assets/images/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/images/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

@@ -2,10 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#102a43">
+<meta name="viewport" content="width=device-width,initial-scale=1"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
 <title>Khetha Path</title>
-<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="auth-first-page">

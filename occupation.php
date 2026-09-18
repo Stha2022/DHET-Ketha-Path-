@@ -47,7 +47,7 @@ function jf_verdict_label(int $score): string {
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
         <title>Occupations &amp; Job Fit</title>
         <link rel="stylesheet" href="assets/css/style.css">
     </head>
