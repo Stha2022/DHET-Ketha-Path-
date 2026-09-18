@@ -1,6 +1,9 @@
 <?php
 session_start();
+require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/job-fit-data.php';
+require_once __DIR__ . '/includes/profile.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 $occupations = kp_occupations();
 
@@ -14,18 +17,57 @@ $old = $isSubmit ? $_POST : [];
 
 $results = null;
 $errors = [];
+$csrfFailed = false;
+
+// A Job Fit check is saved to the shared profile, one entry per occupation
+// (a broad check scores every occupation, so it saves one for each).
+$saveFit = fn(array $detail, string $mode) => [
+    'overall' => $detail['overall'], 'flags' => $detail['flags'], 'completed_at' => time(), 'mode' => $mode,
+];
 
 if ($isSubmit) {
-    $parsed = jf_parse_answers($_POST);
-    $errors = $parsed['errors'];
-    if (empty($errors)) {
-        if ($occupation) {
-            $results = ['mode' => 'targeted', 'detail' => jf_score_occupation($parsed['answers'], $occupation)];
-        } else {
-            $results = ['mode' => 'broad', 'matches' => jf_match_occupations($parsed['answers'])];
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        $csrfFailed = true; // the questionnaire re-opens with the answers still filled in
+    } else {
+        $parsed = jf_parse_answers($_POST);
+        $errors = $parsed['errors'];
+        if (empty($errors)) {
+            if ($occupation) {
+                $detail = jf_score_occupation($parsed['answers'], $occupation);
+                $results = ['mode' => 'targeted', 'detail' => $detail];
+                profile_update(['job_fit' => [$occupation['id'] => $saveFit($detail, 'targeted')]]);
+            } else {
+                $matches = jf_match_occupations($parsed['answers']);
+                $results = ['mode' => 'broad', 'matches' => $matches];
+                $toSave = [];
+                foreach ($matches as $m) $toSave[$m['occupation_id']] = $saveFit($m, 'broad');
+                profile_update(['job_fit' => $toSave]);
+            }
         }
     }
 }
+
+// Already checked this occupation? Opening its Job Fit link shows the saved
+// result rather than an empty form; ?redo=1 (the "Redo" link) starts again.
+$profile = profile_get();
+$savedFit = $occupation ? ($profile['job_fit'][$occupation['id']] ?? null) : null;
+if (!$results && !$isSubmit && $savedFit && isset($_GET['fit']) && !isset($_GET['redo'])) {
+    $results = [
+        'mode' => 'targeted', 'saved' => true,
+        'detail' => [
+            'occupation_id' => $occupation['id'], 'title' => $occupation['title'], 'field' => $occupation['field'],
+            'overall' => (int)$savedFit['overall'], 'flags' => (array)$savedFit['flags'],
+        ],
+        'completedAt' => $savedFit['completed_at'] ?? null,
+    ];
+}
+
+// "Suggested for you": careers the learner already picked, then the ones
+// Career Choice pointed to, without repeats.
+$suggested = [];
+foreach ($profile['intended_careers'] as $sid) $suggested[$sid] = 'Your pick';
+foreach ($profile['career_quiz']['top_careers'] as $sid) $suggested[$sid] ??= 'From Career Choice';
+$suggested = array_slice(array_intersect_key($suggested, $occupations), 0, 6, true);
 
 $valueLabels = kp_work_value_keys();
 $valueBlurbs = jf_work_value_blurbs();
@@ -44,7 +86,7 @@ function jf_verdict_label(int $score): string {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= kp_lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
@@ -77,6 +119,9 @@ function jf_verdict_label(int $score): string {
                                     <div class="display-6 fw-bold text-<?= jf_score_class($detail['overall']) ?> lh-1"><?= jf_verdict_label($detail['overall']) ?></div>
                                 </div>
                             </div>
+                            <?php if (!empty($results['saved']) && !empty($results['completedAt'])): ?>
+                                <p class="text-muted small mb-0 mt-3">Your saved result from <?= date('j M Y', (int)$results['completedAt']) ?>.</p>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -94,8 +139,8 @@ function jf_verdict_label(int $score): string {
                     </div>
 
                     <div class="d-grid d-sm-flex gap-2">
-                        <a href="occupation.php?id=<?= urlencode($detail['occupation_id']) ?>&amp;fit=1" class="btn btn-outline-secondary">Retake this check</a>
-                        <a href="occupation.php" class="btn btn-outline-secondary">Back to directory</a>
+                        <a href="occupation.php?id=<?= urlencode($detail['occupation_id']) ?>&amp;fit=1&amp;redo=1" class="btn btn-outline-secondary">Redo</a>
+                        <a href="occupation.php" class="btn btn-outline-secondary">Back to careers</a>
                         <a href="occupation.php?fit=1" class="btn btn-primary">Run a broad check instead</a>
                     </div>
 
@@ -104,7 +149,7 @@ function jf_verdict_label(int $score): string {
                     <div class="card mb-3">
                         <div class="card-header">Your best occupation fits</div>
                         <div class="card-body">
-                            <p class="text-muted small mb-3">Ranked by overall fit across the whole directory. Tap one for the full breakdown.</p>
+                            <p class="text-muted small mb-3">Ranked by overall fit across all careers. Tap one for the full breakdown.</p>
                             <div class="row g-3">
                                 <?php foreach (array_slice($results['matches'], 0, 12) as $m): ?>
                                     <div class="col-sm-6 col-lg-4">
@@ -139,7 +184,7 @@ function jf_verdict_label(int $score): string {
 
                     <div class="d-grid d-sm-flex gap-2">
                         <a href="occupation.php?fit=1" class="btn btn-outline-secondary">Start over</a>
-                        <a href="occupation.php" class="btn btn-outline-secondary">Back to directory</a>
+                        <a href="occupation.php" class="btn btn-outline-secondary">Back to careers</a>
                     </div>
 
                 <?php endif; ?>
@@ -152,6 +197,7 @@ function jf_verdict_label(int $score): string {
                     <p class="text-muted">This isn't the "what would you enjoy" quiz &mdash; that's Career Choice. This one asks what you can actually do and sustain.</p>
                 </div>
 
+                <?php if ($csrfFailed): ?><div class="alert alert-danger">Your session expired before your answers could be saved. Your answers are still filled in below. Sign in again if needed, then tap "See my results".</div><?php endif; ?>
                 <?php if (!empty($errors)): ?><div class="alert alert-danger">Please answer everything below before continuing.</div><?php endif; ?>
 
                 <div class="card mb-3">
@@ -160,9 +206,9 @@ function jf_verdict_label(int $score): string {
                             <p class="text-muted small mb-1">Checking your fit for</p>
                             <h4 class="mb-0"><?= htmlspecialchars($occupation['title']) ?> <span class="badge text-bg-light border"><?= htmlspecialchars($occupation['field']) ?></span></h4>
                         <?php else: ?>
-                            <?php if ($id !== ''): ?><p class="text-muted small mb-2">We couldn't find that occupation, so this will run as a broad check across the whole directory.</p><?php endif; ?>
+                            <?php if ($id !== ''): ?><p class="text-muted small mb-2">We couldn't find that occupation, so this will run as a broad check across all careers.</p><?php endif; ?>
                             <h4 class="mb-0">Broad Job Fit check</h4>
-                            <p class="text-muted small mb-0">We'll rank every occupation in our directory against your answers.</p>
+                            <p class="text-muted small mb-0">We'll rank every occupation in our list against your answers.</p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -181,6 +227,7 @@ function jf_verdict_label(int $score): string {
 
                 <form method="post" action="occupation.php" id="fitForm" novalidate>
                     <input type="hidden" name="action" value="fit_submit">
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <input type="hidden" name="occupation_id" value="<?= htmlspecialchars($id) ?>">
 
                     <div class="card mb-3 fit-step" data-step="1">
@@ -290,7 +337,7 @@ function jf_verdict_label(int $score): string {
             <?php elseif ($occupation): ?>
                 <?php // ============================== OCCUPATION DETAIL ============================== ?>
 
-                <div class="mb-3"><a href="occupation.php" class="text-decoration-none">&larr; Back to directory</a></div>
+                <div class="mb-3"><a href="occupation.php" class="text-decoration-none">&larr; Back to careers</a></div>
 
                 <div class="card mb-3">
                     <div class="card-body">
@@ -310,6 +357,28 @@ function jf_verdict_label(int $score): string {
                     </div>
                 </div>
 
+                <?php if ($savedFit): ?>
+                <div class="card mb-3 border-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                            <h5 class="mb-0">Your Job Fit for this role</h5>
+                            <span class="badge text-bg-<?= jf_score_class((int)$savedFit['overall']) ?> fs-6"><?= jf_verdict_label((int)$savedFit['overall']) ?></span>
+                        </div>
+                        <?php if (!empty($savedFit['flags'])): ?>
+                            <ul class="mb-3 ps-3">
+                                <?php foreach (array_slice((array)$savedFit['flags'], 0, 3) as $flag): ?><li class="mb-1"><?= htmlspecialchars($flag) ?></li><?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <p class="text-muted mb-3">No major mismatches based on what you told us.</p>
+                        <?php endif; ?>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="occupation.php?id=<?= urlencode($occupation['id']) ?>&amp;fit=1" class="btn btn-primary btn-sm">See the full result</a>
+                            <a href="occupation.php?id=<?= urlencode($occupation['id']) ?>&amp;fit=1&amp;redo=1" class="btn btn-outline-secondary btn-sm">Redo</a>
+                        </div>
+                        <p class="text-muted small mb-0 mt-2">Saved <?= date('j M Y', (int)($savedFit['completed_at'] ?? time())) ?>.</p>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="card mb-3 border-primary">
                     <div class="card-body text-center py-4">
                         <h5 class="mb-2">Not sure you'd fit this role day to day?</h5>
@@ -317,6 +386,7 @@ function jf_verdict_label(int $score): string {
                         <a href="occupation.php?id=<?= urlencode($occupation['id']) ?>&amp;fit=1" class="btn btn-primary btn-lg">Am I a fit for this? &rarr;</a>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <div class="card mb-3">
                     <div class="card-header">Subject requirements</div>
@@ -359,17 +429,38 @@ function jf_verdict_label(int $score): string {
 
                 <div class="mb-4">
                     <h2>Occupations</h2>
-                    <p class="text-muted">Browse the directory, then check "Am I a fit for this?" on any occupation &mdash; or run a broad check across all of them at once.</p>
+                    <p class="text-muted">Browse the careers, then check "Am I a fit for this?" on any occupation &mdash; or run a broad check across all of them at once.</p>
                 </div>
 
                 <?php if ($id !== '' && !$occupation): ?>
-                    <div class="alert alert-warning">We couldn't find that occupation. Here's the full directory instead.</div>
+                    <div class="alert alert-warning">We couldn't find that occupation. Here's the full list instead.</div>
+                <?php endif; ?>
+
+                <?php if ($suggested): ?>
+                <div class="card mb-4">
+                    <div class="card-header">Suggested for you</div>
+                    <div class="card-body pb-0">
+                        <p class="text-muted small mb-0">Careers you picked or that Career Choice pointed to. Check how well each one fits you.</p>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($suggested as $sid => $source): $sf = $profile['job_fit'][$sid] ?? null; ?>
+                            <a href="occupation.php?id=<?= urlencode($sid) ?>&amp;fit=1" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2">
+                                <span><?= htmlspecialchars($occupations[$sid]['title']) ?> <small class="text-muted"><?= $source ?></small></span>
+                                <?php if ($sf): ?>
+                                    <span class="badge text-bg-<?= jf_score_class((int)$sf['overall']) ?>"><?= jf_verdict_label((int)$sf['overall']) ?></span>
+                                <?php else: ?>
+                                    <span class="small text-primary text-nowrap">Check my fit &rarr;</span>
+                                <?php endif; ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
                 <?php endif; ?>
 
                 <div class="card mb-4 border-primary">
                     <div class="card-body text-center py-4">
                         <h5 class="mb-2">Not sure which one to check?</h5>
-                        <p class="text-muted mb-3">Run the Job Fit check on its own &mdash; we'll rank every occupation in the directory against your answers.</p>
+                        <p class="text-muted mb-3">Run the Job Fit check on its own &mdash; we'll rank every occupation in the list against your answers.</p>
                         <a href="occupation.php?fit=1" class="btn btn-outline-primary">Run a broad Job Fit check &rarr;</a>
                     </div>
                 </div>

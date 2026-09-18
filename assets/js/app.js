@@ -32,7 +32,7 @@ function ask(question) {
     headers:{"Content-Type":"application/x-www-form-urlencoded"},
     body:"question="+encodeURIComponent(question)
   }).then(r=>r.json()).then(data => addMessage(data.answer, "ai", data.tag))
-    .catch(() => addMessage("You appear to be offline. Your saved journey still works, but this live companion response needs a connection."));
+    .catch(() => addMessage((window.KP_I18N && KP_I18N.offline) || "You appear to be offline. Your saved journey still works, but this live companion response needs a connection."));
 }
 
 function adaptPath(scenario) {
@@ -42,7 +42,7 @@ function adaptPath(scenario) {
   const cards = document.getElementById("routeCards");
   if (!result) return;
 
-  const data = {
+  const defaults = {
     notqualify: {
       title:"Your goal can have more than one route.",
       text:"Instead of stopping at the first requirement, Khetha can help you compare adjacent qualifications and progression routes that continue toward a related career goal.",
@@ -63,17 +63,19 @@ function adaptPath(scenario) {
       text:"Khetha can keep the career goal fixed while allowing the learner to compare different qualification and provider options.",
       routes:["Compare qualifications","Compare providers","Save a preferred route"]
     }
-  }[scenario];
+  };
+  const data = ((window.KP_I18N && KP_I18N.scenarios) || defaults)[scenario];
+  const explore = (window.KP_I18N && KP_I18N.explore) || "Explore →";
 
   title.textContent = data.title;
   text.textContent = data.text;
-  cards.innerHTML = data.routes.map((r,i)=>`<div class="route-card"><b>0${i+1}</b><span>${escapeHtml(r)}</span><em>Explore →</em></div>`).join("");
+  cards.innerHTML = data.routes.map((r,i)=>`<div class="route-card"><b>0${i+1}</b><span>${escapeHtml(r)}</span><em>${escapeHtml(explore)}</em></div>`).join("");
   result.classList.remove("hidden");
   result.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
 function markComplete(button) {
-  button.textContent = "Explored ✓";
+  button.textContent = button.dataset.done || "Explored ✓";
   button.classList.add("completed");
 }
 

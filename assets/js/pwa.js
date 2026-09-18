@@ -1,15 +1,36 @@
 // Registers the service worker, warms the offline cache after the learner
 // reaches their dashboard, and offers an "Install" prompt.
 (() => {
+  // Data saver (Settings page): no greeting video, no background page saving.
+  let dataSaver = false;
+  try { dataSaver = !!JSON.parse(localStorage.getItem("khetha-settings") || "{}").dataSaver; } catch (e) {}
+  if (dataSaver) {
+    document.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("video.greeting-video").forEach(v => {
+        v.removeAttribute("autoplay");
+        v.preload = "none";
+        v.pause();
+      });
+    });
+  }
+
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("service-worker.js")
         .then(() => navigator.serviceWorker.ready)
         .then(reg => {
           // The dashboard only loads for a signed-in learner, so this is the
-          // right moment to save their pages for offline use.
-          if (/dashboard\.php$/.test(location.pathname) && navigator.onLine && reg.active) {
+          // right moment to save their pages for offline use. Saved pages are
+          // in one language, so save them again whenever the language changes.
+          const lang = document.documentElement.lang;
+          let saved = null;
+          try { saved = localStorage.getItem("khetha-lang"); } catch (e) {}
+          const langChanged = saved !== null && saved !== lang;
+          if (!dataSaver && (/dashboard\.php$/.test(location.pathname) || langChanged) && navigator.onLine && reg.active) {
             reg.active.postMessage({ type: "warm" });
+            try { localStorage.setItem("khetha-lang", lang); } catch (e) {}
+          } else if (saved === null) {
+            try { localStorage.setItem("khetha-lang", lang); } catch (e) {}
           }
         })
         .catch(() => {});

@@ -8,6 +8,9 @@ Dashboard flow
 2. section to show what the user can do first
 3. the rest of the questionnaires
 
+SIDENOTES:
+CV builder
+
 
 NOTES:
 -- reduce the amount of words and go for the least resistant path to complete the task.

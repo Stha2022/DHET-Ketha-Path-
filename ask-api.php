@@ -1,8 +1,9 @@
 <?php
 session_start();
+require_once __DIR__ . '/includes/profile.php';
 header('Content-Type: application/json');
 $q = strtolower(trim($_POST['question'] ?? ''));
-$name = $_SESSION['name'] ?? 'there';
+$name = profile_get()['name'] ?: 'there';
 
 $response = "I can help you explore your journey. Try asking about a career, qualification, subjects, your next step, or a 'What If?' scenario.";
 $tag = "Journey guidance";

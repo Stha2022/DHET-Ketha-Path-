@@ -88,6 +88,79 @@ function sj_marks_bands(): array {
     ];
 }
 
+// The marks band whose midpoint is nearest a saved mark (the profile stores
+// midpoints, the wizard's <select> works in bands). Ties go to the lower band.
+function sj_band_for_mark(int $mark): string {
+    $best = '';
+    $bestGap = PHP_INT_MAX;
+    foreach (sj_marks_bands() as $band => $midpoint) {
+        $gap = abs($midpoint - $mark);
+        if ($gap < $bestGap) { $best = $band; $bestGap = $gap; }
+    }
+    return $best;
+}
+
+/**
+ * Plain OPEN / CLOSED for one occupation against the learner's current
+ * subjects and Maths track, with a one-line reason.
+ *
+ * CLOSED = the Maths track hard-blocks it, or a required subject isn't
+ * taken (the same test sj_forward_package() uses for "keeps open"). Marks
+ * never close a career here — a mark under the bar only adds a warning to an
+ * OPEN reason, since marks can still change.
+ *
+ * @param array $occ One entry from sj_occupations()
+ * @return array{open: bool, reason: string, connected: string[]}
+ */
+function sj_open_status(array $selectedSubjects, array $marks, string $mathsTrack, array $occ): array {
+    $has = fn(string $s) => in_array($s, $selectedSubjects, true) || $s === $mathsTrack;
+    $needs = fn(string $s) => $s . (isset($occ['min_marks'][$s]) ? ' (min ' . $occ['min_marks'][$s] . '%)' : '');
+
+    $mathsBlocked = $occ['math_track'] === 'mathematics' && $mathsTrack !== 'Mathematics';
+    $missing = [];
+    foreach ($occ['required'] as $s) {
+        if ($mathsBlocked && $s === 'Mathematics') continue; // said in the Maths clause instead
+        if (!$has($s)) $missing[] = $s;
+    }
+
+    if ($mathsBlocked || $missing) {
+        $names = array_map($needs, $missing);
+        $mathsClause = 'needs ' . $needs('Mathematics') . ', you take ' . ($mathsTrack !== '' ? $mathsTrack : 'no Maths track yet');
+        if ($mathsBlocked && $names) {
+            $reason = 'Closed: ' . $mathsClause . '; also needs ' . sj_join_and($names);
+        } elseif ($mathsBlocked) {
+            $reason = 'Closed: ' . $mathsClause;
+        } else {
+            $reason = 'Closed: needs ' . sj_join_and($names) . ", you don't take " . (count($names) === 1 ? 'it' : 'them');
+        }
+        return ['open' => false, 'reason' => $reason, 'connected' => []];
+    }
+
+    $connected = [];
+    foreach (array_merge($occ['required'], $occ['recommended']) as $s) {
+        if ($has($s) && !in_array($s, $connected, true)) $connected[] = $s;
+    }
+    if ($connected) {
+        $reason = 'Connected through ' . implode(', ', $connected);
+    } else {
+        $reason = 'Open: no subjects required' . ($occ['recommended'] ? ' (recommended: ' . implode(', ', $occ['recommended']) . ')' : '');
+    }
+
+    $gaps = [];
+    foreach ($occ['min_marks'] as $s => $min) {
+        if ($has($s) && isset($marks[$s]) && $marks[$s] < $min) $gaps[] = "$s needs $min%, you have about {$marks[$s]}%";
+    }
+    if ($gaps) $reason .= '. Watch your marks: ' . implode('; ', $gaps);
+
+    return ['open' => true, 'reason' => $reason, 'connected' => $connected];
+}
+
+// "A", "A and B", "A, B and C".
+function sj_join_and(array $items): string {
+    $last = array_pop($items);
+    return $items ? implode(', ', $items) . ' and ' . $last : (string)$last;
+}
+
 /**
  * Occupations hard-closed by maths-track choice alone — meaningful even
  * before any marks/subjects are known, so it can be shown right after

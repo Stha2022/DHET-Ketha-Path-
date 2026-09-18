@@ -1,6 +1,10 @@
 <?php
 session_start();
+require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/career-quiz-data.php';
+require_once __DIR__ . '/includes/profile.php';
+require_once __DIR__ . '/includes/matching.php';
+require_once __DIR__ . '/includes/csrf.php';
 
 $dimensions = cq_dimensions();
 $items = cq_items();
@@ -14,53 +18,95 @@ $dimBlurbs = [
     'C' => 'You like staying organised and keeping things in order.',
 ];
 
-$results = null;
-$errors  = [];
+$errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $answersRaw = json_decode($_POST['answers'] ?? '', true);
 
-    if (!is_array($answersRaw) || count($answersRaw) < 30) {
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        $errors['csrf'] = 'Your session expired before your answers could be saved. Your answers are still on this device, so sign in again and tap finish.';
+    } elseif (!is_array($answersRaw) || count($answersRaw) < 30) {
         $errors['answers'] = 'Something went wrong collecting your answers. Please try the questionnaire again.';
     } else {
         $score   = cq_score($answersRaw);
         $matches = array_slice(cq_match_occupations($score['vector']), 0, 6);
 
-        // Group by reachability from Subject Chooser, if that's already been run.
-        $subjectBase = $_SESSION['subject_tool'] ?? null;
-        if ($subjectBase) {
-            $reverse = sj_reverse_scan($subjectBase['selectedSubjects'], $subjectBase['marks'], $subjectBase['maths']);
-            $bucketByKey = [];
-            foreach ($reverse as $r) $bucketByKey[$r['key']] = $r['bucket'];
-            foreach ($matches as &$m) {
-                $m['bucket'] = $bucketByKey[$m['key']] ?? null;
-            }
-            unset($m);
-        }
+        // The result lives in the shared profile; the results screen is built from it.
+        profile_update(['career_quiz' => [
+            'code' => $score['code'],
+            'scores' => array_map(fn($row) => $row['score'], $score['scores']),
+            'top_careers' => array_column($matches, 'key'),
+            'completed_at' => time(),
+        ]]);
 
-        $results = [
-            'score' => $score,
-            'matches' => $matches,
-            'itemsAnswered' => count($answersRaw),
-            'hasSubjectProfile' => (bool)$subjectBase,
-        ];
-
-        // Stored in session for now so Dashboard/My Path can see this
-        // assessment as done and reuse the score. TODO: once
-        // database/migration_assessment_results.sql is wired up, persist
-        // this to assessment_results instead (see subject_tool's dashboard.php
-        // comment for the same pending swap) — session stays as a cache.
-        $_SESSION['career_quiz'] = [
-            'answers' => $answersRaw,
-            'score' => $score,
-            'matches' => $matches,
-            'completedAt' => time(),
-        ];
+        // Post/redirect/get, so refreshing the results never re-submits the quiz.
+        header('Location: career-quiz.php?saved=1');
+        exit;
     }
+}
+
+$profile = profile_get();
+$saved = $profile['career_quiz']['code'] !== '' ? $profile['career_quiz'] : null;
+$retake = isset($_GET['retake']);
+
+// Show the saved result whenever there is one, unless the learner chose to retake.
+$results = null;
+$interestLean = null;
+$friendly = kp_riasec_friendly_names();
+if ($saved && !$retake && !$errors) {
+    $vector = [];
+    foreach (array_keys($dimensions) as $d) $vector[$d] = ($saved['scores'][$d] ?? 0) / 100;
+
+    // Saved order and ids are kept; the cosine matches only supply labels and reasons.
+    $byKey = [];
+    foreach (cq_match_occupations($vector) as $m) $byKey[$m['key']] = $m;
+    $matches = [];
+    foreach ($saved['top_careers'] as $key) {
+        if (isset($byKey[$key])) $matches[] = $byKey[$key];
+    }
+
+    // Reasons under each career come from rank_careers() (interests + this result).
+    $rankReasons = [];
+    foreach (rank_careers($profile) as $r) $rankReasons[$r['id']] = $r['reasons'];
+
+    // OPEN / CLOSED against the learner's current subjects, once known. This is
+    // the same test (and wording) Subject Chooser uses, so a career never shows
+    // one status here and a different one there.
+    $hasSubjectProfile = $profile['maths_track'] !== '' && !empty($profile['subjects']);
+    if ($hasSubjectProfile) {
+        $occupations = sj_occupations();
+        foreach ($matches as &$m) {
+            $m['status'] = isset($occupations[$m['key']])
+                ? sj_open_status($profile['subjects'], $profile['marks'], $profile['maths_track'], $occupations[$m['key']])
+                : null;
+        }
+        unset($m);
+    }
+
+    // Do the interest chips point somewhere other than the quiz? (Only when the
+    // quiz's top letter isn't among the interests' joint-highest letters.)
+    $interestLean = null;
+    $byInterest = $profile['riasec_from_interests'];
+    if ($byInterest) {
+        $best = max($byInterest);
+        $topInterest = array_keys(array_filter($byInterest, fn($v) => $v === $best));
+        $quizTop = $saved['code'][0];
+        if (!in_array($quizTop, $topInterest, true)) $interestLean = [$topInterest[0], $quizTop];
+    }
+
+    $results = [
+        'code' => $saved['code'],
+        'top3' => str_split($saved['code']),
+        'matches' => $matches,
+        'itemsAnswered' => count($items),
+        'completedAt' => $saved['completed_at'],
+        'hasSubjectProfile' => $hasSubjectProfile,
+    ];
+    $friendly = kp_riasec_friendly_names();
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= kp_lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
@@ -78,89 +124,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <?php if ($results): ?>
 
-                <?php if (!empty($errors['answers'])): ?>
-                    <div class="alert alert-danger"><?= htmlspecialchars($errors['answers']) ?></div>
-                <?php else: ?>
-
-                    <div class="card mb-3 border-primary">
-                        <div class="card-header bg-primary-subtle">Your code</div>
-                        <div class="card-body">
-                            <h3 class="mb-3"><?= htmlspecialchars($results['score']['code']) ?></h3>
-                            <p class="mb-2">You lean towards these three things most:</p>
-                            <ul class="mb-3">
-                                <?php foreach ($results['score']['top3'] as $d): ?>
-                                    <li><strong><?= htmlspecialchars($dimensions[$d]) ?>:</strong> <?= htmlspecialchars($dimBlurbs[$d]) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                            <p class="text-muted small mb-0">This is based on all <?= (int)$results['itemsAnswered'] ?> questions.</p>
-                        </div>
+                <div class="card mb-3 border-primary">
+                    <div class="card-header bg-primary-subtle">Your code</div>
+                    <div class="card-body">
+                        <h3 class="mb-3"><?= htmlspecialchars($results['code']) ?></h3>
+                        <p class="mb-2">You lean towards these three things most:</p>
+                        <ul class="mb-3">
+                            <?php foreach ($results['top3'] as $d): ?>
+                                <li><strong><?= htmlspecialchars($dimensions[$d]) ?>:</strong> <?= htmlspecialchars($dimBlurbs[$d]) ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                        <?php if ($interestLean): ?>
+                            <p class="mb-3">Your interests lean <?= htmlspecialchars($friendly[$interestLean[0]]) ?> (<?= $interestLean[0] ?>), but your answers lean <?= htmlspecialchars($friendly[$interestLean[1]]) ?> (<?= $interestLean[1] ?>). Both are worth exploring.</p>
+                        <?php endif; ?>
+                        <p class="text-muted small mb-0">Based on all <?= (int)$results['itemsAnswered'] ?> questions. Saved to your profile on <?= date('j M Y', (int)$results['completedAt']) ?>.</p>
                     </div>
+                </div>
 
-                    <?php if (!$results['hasSubjectProfile']): ?>
-                        <div class="alert alert-info">
-                            Want to see which of these you could actually reach with your current subjects? <a href="subject.php" class="alert-link">Try Subject Chooser</a> and come back here.
-                        </div>
-                    <?php endif; ?>
-
-                    <div class="card mb-3">
-                        <div class="card-header">Careers that match your interests</div>
-                        <div class="card-body">
-                            <p class="text-muted small mb-3">Tap a career to see why it matched.</p>
-                            <div class="row g-3">
-                                <?php foreach ($results['matches'] as $m): ?>
-                                    <div class="col-sm-6 col-lg-4">
-                                        <button type="button" class="btn text-start w-100 h-100 p-3 border rounded-3" data-bs-toggle="modal" data-bs-target="#careerModal" data-career="<?= htmlspecialchars($m['label']) ?>" data-field="<?= htmlspecialchars($m['field']) ?>" data-match="<?= (int)$m['match'] ?>" data-reason="<?= htmlspecialchars($m['reason']) ?>">
-                                            <div class="fw-semibold mb-1"><?= htmlspecialchars($m['label']) ?></div>
-                                            <div class="text-muted small mb-2"><?= htmlspecialchars($m['field']) ?></div>
-                                            <div class="fw-bold text-primary mb-2"><?= htmlspecialchars(cq_match_label((int)$m['match'])) ?></div>
-                                            <?php if ($results['hasSubjectProfile']): ?>
-                                                <?php
-                                                    $bucket = $m['bucket'] ?? null;
-                                                    $badge = ['open' => 'success', 'effort' => 'warning', 'closed' => 'secondary'][$bucket] ?? 'light border';
-                                                    $label = ['open' => 'Open', 'effort' => 'With effort', 'closed' => 'Closed'][$bucket] ?? 'Unknown';
-                                                ?>
-                                                <span class="badge text-bg-<?= $badge ?>"><?= $label ?></span>
-                                            <?php endif; ?>
-                                        </button>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="modal fade" id="careerModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <div>
-                                        <h5 class="modal-title" id="careerModalLabel"></h5>
-                                        <span class="badge text-bg-light border" id="careerModalField"></span>
-                                        <span class="badge text-bg-primary" id="careerModalMatch"></span>
-                                    </div>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="card mb-3">
+                    <div class="card-header">Careers that match your interests</div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">Tap a career to see why it matched.</p>
+                        <div class="row g-3">
+                            <?php foreach ($results['matches'] as $m): ?>
+                                <div class="col-sm-6 col-lg-4">
+                                    <button type="button" class="btn text-start w-100 h-100 p-3 border rounded-3" data-bs-toggle="modal" data-bs-target="#careerModal" data-career="<?= htmlspecialchars($m['label']) ?>" data-field="<?= htmlspecialchars($m['field']) ?>" data-match="<?= (int)$m['match'] ?>" data-reason="<?= htmlspecialchars($m['reason']) ?>">
+                                        <div class="fw-semibold mb-1"><?= htmlspecialchars($m['label']) ?></div>
+                                        <div class="text-muted small mb-2"><?= htmlspecialchars($m['field']) ?></div>
+                                        <div class="fw-bold text-primary mb-2"><?= htmlspecialchars(cq_match_label((int)$m['match'])) ?></div>
+                                        <?php foreach ($rankReasons[$m['key']] ?? [] as $why): ?>
+                                            <div class="small text-muted mb-1"><?= htmlspecialchars($why) ?></div>
+                                        <?php endforeach; ?>
+                                        <?php if ($results['hasSubjectProfile'] && !empty($m['status'])): ?>
+                                            <span class="badge text-bg-<?= $m['status']['open'] ? 'success' : 'secondary' ?> mt-1"><?= $m['status']['open'] ? 'OPEN' : 'CLOSED' ?></span>
+                                            <div class="small <?= $m['status']['open'] ? 'text-success-emphasis' : 'text-muted' ?> mt-1"><?= htmlspecialchars($m['status']['reason']) ?></div>
+                                        <?php endif; ?>
+                                    </button>
                                 </div>
-                                <div class="modal-body">
-                                    <div id="careerModalLoading" class="text-center text-muted py-4">
-                                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                                        Generating insights for this career…
-                                    </div>
-                                    <div id="careerModalContent" class="d-none">
-                                        <p class="small text-muted fst-italic">This is placeholder content. The full version will generate it with AI from approved NCAP/DHET sources.</p>
-                                        <h6>Why it matched</h6>
-                                        <p id="careerModalReason"></p>
-                                        <h6>About this career</h6>
-                                        <p id="careerModalAbout"></p>
-                                    </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="subject.php" class="btn btn-primary mb-3">Check which of these your subjects can reach &rarr;</a>
+
+                <div class="modal fade" id="careerModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <div>
+                                    <h5 class="modal-title" id="careerModalLabel"></h5>
+                                    <span class="badge text-bg-light border" id="careerModalField"></span>
+                                    <span class="badge text-bg-primary" id="careerModalMatch"></span>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="careerModalLoading" class="text-center text-muted py-4">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                    Generating insights for this career…
+                                </div>
+                                <div id="careerModalContent" class="d-none">
+                                    <p class="small text-muted fst-italic">This is placeholder content. The full version will generate it with AI from approved NCAP/DHET sources.</p>
+                                    <h6>Why it matched</h6>
+                                    <p id="careerModalReason"></p>
+                                    <h6>About this career</h6>
+                                    <p id="careerModalAbout"></p>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                <?php endif; ?>
-
-                <a href="career-quiz.php" class="btn btn-outline-secondary">Start over</a>
+                <div>
+                    <a href="career-quiz.php?retake=1" class="btn btn-outline-secondary">Retake</a>
+                </div>
 
             <?php else: ?>
+
+                <?php if (!empty($errors['csrf'])): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($errors['csrf']) ?></div>
+                <?php elseif (!empty($errors['answers'])): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($errors['answers']) ?></div>
+                <?php endif; ?>
+
+                <?php if ($saved && $retake): ?>
+                    <div class="alert alert-info py-2 small">You've done this before. Your saved result stays until you finish this one, then it's replaced.</div>
+                <?php endif; ?>
 
                 <div class="card">
                     <div class="card-body text-center py-5" id="quizStart">
@@ -200,6 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <form method="post" action="career-quiz.php" id="quizForm" class="d-none">
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <input type="hidden" name="answers" id="answersInput">
                 </form>
 
@@ -211,6 +262,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         (function(){
             var items = <?= json_encode($items) ?>;
 
+            // In-progress answers only; the finished result is saved to the
+            // server profile (see the POST handler above).
             var STORAGE_KEY = 'khetha_career_quiz_progress';
             var currentIndex = 0;
             var answers = {};
@@ -247,9 +300,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             var saved = loadSaved();
+            // All 30 answered but the save didn't go through (e.g. the session
+            // expired): the answers are still here, so offer to send them again.
+            var savedComplete = !!saved && saved.currentIndex >= items.length;
             if (saved && resumeBtn) {
                 resumeBtn.classList.remove('d-none');
-                resumeBtn.textContent = 'Resume where you left off (question ' + (saved.currentIndex + 1) + ' of ' + items.length + ')';
+                resumeBtn.textContent = savedComplete
+                    ? 'Your ' + items.length + ' answers are saved on this device. Tap to finish'
+                    : 'Resume where you left off (question ' + (saved.currentIndex + 1) + ' of ' + items.length + ')';
             }
 
             function showItem(i) {
@@ -276,8 +334,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            // The saved progress is deliberately NOT cleared here: it is only
+            // removed once the results page confirms the server has the result.
             function finish() {
-                clearSaved();
                 document.getElementById('answersInput').value = JSON.stringify(answers);
                 document.getElementById('quizForm').submit();
             }
@@ -316,7 +375,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 begin(false);
             });
 
-            if (resumeBtn) resumeBtn.addEventListener('click', function(){ begin(saved); });
+            if (resumeBtn) resumeBtn.addEventListener('click', function(){
+                if (savedComplete) { answers = saved.answers; finish(); return; }
+                begin(saved);
+            });
             if (resumeFromPauseBtn) resumeFromPauseBtn.addEventListener('click', function(){ begin(loadSaved() || { currentIndex: currentIndex, answers: answers }); });
 
             prevBtn.addEventListener('click', goBack);
@@ -335,6 +397,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php else: ?>
         <script>
         (function(){
+            <?php if (isset($_GET['saved'])): ?>
+            // Just finished: the server has the result now, so the resume data can go.
+            try { localStorage.removeItem('khetha_career_quiz_progress'); } catch (e) {}
+            <?php endif; ?>
+
             var careerModal = document.getElementById('careerModal');
             if (!careerModal) return;
             careerModal.addEventListener('show.bs.modal', function(event){

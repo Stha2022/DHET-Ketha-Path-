@@ -1,4 +1,4 @@
-const VERSION = "v8";
+const VERSION = "v10";
 const STATIC_CACHE = "khetha-static-" + VERSION;
 const PAGE_CACHE = "khetha-pages-" + VERSION;
 
@@ -22,7 +22,7 @@ const CDN = [
 // dashboard (see assets/js/pwa.js).
 const WARM_PAGES = [
     "dashboard.php", "subject.php", "career-quiz.php", "occupation.php", "my-path.php",
-    "directories.php", "favourites.php", "advice.php", "what-if.php", "contact-advisor.php", "ask.php",
+    "directories.php", "favourites.php", "advice.php", "what-if.php", "contact-advisor.php", "ask.php", "settings.php",
 ];
 
 const STATIC_RE = /\.(css|js|png|jpe?g|svg|webp|ico|gif|woff2?|json)$/;
@@ -52,7 +52,7 @@ self.addEventListener("message", e => {
             fetch(p, { credentials: "same-origin" })
                 .then(r => { if (r.ok && !r.redirected) return c.put(p, r); })
                 .catch(() => {})
-        )))
+        ))).then(() => { if (e.source) e.source.postMessage({ type: "warmed" }); })
     );
 });
 
@@ -69,8 +69,10 @@ self.addEventListener("fetch", e => {
         return;
     }
 
-    // Live endpoints are never cached.
-    if (sameOrigin && /\/(ask-api\.php|api\/)/.test(url.pathname)) return;
+    // Live endpoints are never cached. account.php is in this list because it
+    // carries a CSRF token and the learner's email: a stale copy would show an
+    // expired token, and a saved copy would outlive signing out.
+    if (sameOrigin && /\/(ask-api\.php|account\.php|api\/)/.test(url.pathname)) return;
 
     // Static files and CDN assets: cache-first, refreshed in the background.
     if (!sameOrigin || STATIC_RE.test(url.pathname)) {

@@ -2,7 +2,8 @@
 // Shared top navbar — include once, right after <body> opens, in place of
 // a page's own <header class="topbar">...</header>. Include only on pages
 // that already guard on $_SESSION['user'] (login.php redirects otherwise).
-$kp_name = $_SESSION['user']['name'] ?? 'there';
+require_once __DIR__ . '/lang.php';
+$kp_name = $_SESSION['user']['name'] ?? t('there');
 $kp_initial = strtoupper(substr($kp_name, 0, 1));
 ?>
 <?php include_once __DIR__ . '/bootstrap-css.php'; ?>
@@ -32,12 +33,13 @@ $kp_initial = strtoupper(substr($kp_name, 0, 1));
 
   <div class="d-flex align-items-center gap-2">
     <div class="dropdown">
-      <button class="btn btn-outline-secondary btn-sm dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="langBtn">
-        <span id="langBtnLabel">EN</span>
+      <button class="btn btn-outline-secondary btn-sm dropdown-toggle rounded-pill" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="langBtn" aria-label="<?= t('Language') ?>">
+        <span><?= KP_LANGS[kp_lang()]['label'] ?></span>
       </button>
       <ul class="dropdown-menu dropdown-menu-end kp-dropdown-menu">
-        <li><a class="dropdown-item lang-option active" href="#" data-lang-label="EN">English</a></li>
-        <li><a class="dropdown-item lang-option" href="#" data-lang-label="XH">IsiXhosa</a></li>
+        <?php foreach (KP_LANGS as $code => $l): ?>
+          <li><a class="dropdown-item<?= $code === kp_lang() ? ' active' : '' ?>" href="<?= htmlspecialchars(kp_lang_url($code)) ?>" lang="<?= $code ?>" hreflang="<?= $code ?>"><?= $l['name'] ?></a></li>
+        <?php endforeach; ?>
       </ul>
     </div>
 
@@ -48,25 +50,15 @@ $kp_initial = strtoupper(substr($kp_name, 0, 1));
       </button>
       <ul class="dropdown-menu dropdown-menu-end kp-dropdown-menu">
         <li><h6 class="dropdown-header"><?= htmlspecialchars($kp_name) ?></h6></li>
-        <li><a class="dropdown-item" href="#">My Profile</a></li>
-        <li><a class="dropdown-item" href="#">Settings</a></li>
+        <li><a class="dropdown-item" href="my-profile.php"><?= t('My Profile') ?></a></li>
+        <li><a class="dropdown-item" href="cv.php"><?= t('My CV') ?></a></li>
+        <li><a class="dropdown-item" href="account.php"><?= t('Account & security') ?></a></li>
+        <li><a class="dropdown-item" href="settings.php"><?= t('Settings') ?></a></li>
         <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item text-danger" href="logout.php">Log out</a></li>
+        <li><a class="dropdown-item text-danger" href="logout.php"><?= t('Log out') ?></a></li>
       </ul>
     </div>
   </div>
 </nav>
 
 <?php include_once __DIR__ . '/bootstrap-js.php'; ?>
-<script>
-// Mock language switcher: just swaps the button label and active state,
-// no real translation wired up yet.
-document.querySelectorAll('.lang-option').forEach(function(opt){
-  opt.addEventListener('click', function(e){
-    e.preventDefault();
-    document.querySelectorAll('.lang-option').forEach(function(o){ o.classList.remove('active'); });
-    opt.classList.add('active');
-    document.getElementById('langBtnLabel').textContent = opt.dataset.langLabel;
-  });
-});
-</script>

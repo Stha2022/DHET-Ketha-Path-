@@ -27,6 +27,8 @@
  *                     Medical Practitioner (see kp_search_occupations()).
  *   description, video_url
  *   riasec{R,I,A,S,E,C}   0-100 each. Consumed by Career Choice.
+ *   riasec_code       3-letter code from riasec{} (kp_riasec_code()), added
+ *                     by kp_occupations() when a record doesn't set one.
  *   work_values{}     6 values (kp_work_value_keys()), 0-100. Consumed
  *                     by Job Fit.
  *   work_context{}    outdoors, physical, shifts, travel, people, data,
@@ -94,9 +96,33 @@ function kp_aptitude_keys(): array {
 }
 
 /**
- * @return array<string, array> Keyed by occupation id.
+ * The 3-letter Holland code for a riasec{} vector: its three highest
+ * dimensions, highest first. Ties break in R, I, A, S, E, C order — the same
+ * order Career Choice's cq_score() uses for the learner's own code.
+ */
+function kp_riasec_code(array $riasec): string {
+    $dims = ['R', 'I', 'A', 'S', 'E', 'C'];
+    usort($dims, fn($a, $b) => ($riasec[$b] ?? 0) <=> ($riasec[$a] ?? 0)); // usort is stable in PHP 8
+    return implode('', array_slice($dims, 0, 3));
+}
+
+/**
+ * @return array<string, array> Keyed by occupation id. Every record has a
+ *   'riasec_code' (e.g. 'ICR'): derived from its riasec{} vector unless the
+ *   record below sets one explicitly.
  */
 function kp_occupations(): array {
+    static $cache = null;
+    if ($cache === null) {
+        $cache = _kp_occupation_records();
+        foreach ($cache as $id => $occ) {
+            $cache[$id]['riasec_code'] ??= kp_riasec_code($occ['riasec'] ?? []);
+        }
+    }
+    return $cache;
+}
+
+function _kp_occupation_records(): array {
     return [
         'chemical_engineering' => [
             'id' => 'chemical_engineering', 'ofo_code' => null,

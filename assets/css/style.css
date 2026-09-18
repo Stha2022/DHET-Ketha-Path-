@@ -109,3 +109,35 @@ html,body{overflow-x:hidden!important;overflow-y:auto!important}
 .offline-page{min-height:100vh;background:linear-gradient(135deg,#f5faf9,#eef7f6);display:grid;place-items:center;text-align:center;padding:25px}.offline-page main{max-width:430px;background:#fff;border:1px solid var(--line);border-radius:24px;padding:35px;box-shadow:var(--shadow)}.offline-logo{width:150px;margin:0 auto 20px}.offline-icon{font-size:45px}.offline-page h1{font-size:34px;margin:10px 0}.offline-page p{color:var(--muted);line-height:1.6;font-size:13px;margin-bottom:20px}
 @media(max-width:850px){.hero-greeting{grid-template-columns:1fr;min-height:0;padding:25px 22px}.hero-greeting-copy{text-align:center}.hero-greeting-copy .eyebrow{text-align:center}.hero-cta{margin:auto}.greeting-video-wrap{height:300px;margin-top:-5px}.quick-actions{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.dashboard-lite{padding:16px 12px 25px}.hero-greeting{border-radius:22px;padding:22px 16px}.hero-greeting h1{font-size:38px}.hero-tagline{font-size:15px}.greeting-video-wrap{height:245px}.video-caption{font-size:9px;padding:7px 9px}.quick-actions{gap:8px}.quick-actions a{padding:13px 11px;border-radius:14px}.quick-actions span{font-size:19px}.quick-actions b{font-size:11px}.profile-mini{gap:8px}.journey-prompt{padding:13px}.journey-prompt b{font-size:11px}.journey-prompt small{font-size:9px}.journey-prompt>a{font-size:10px;padding:8px 10px}}
+
+/* Language picker for pages without the Bootstrap navbar */
+.lang-links{display:inline-flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:999px;background:#fff}
+.lang-links a{font-size:12px;font-weight:800;color:var(--muted);padding:6px 11px;border-radius:999px;min-width:38px;text-align:center}
+.lang-links a:hover,.lang-links a:focus-visible{background:var(--mint);color:var(--ink)}
+.lang-links a.active{background:var(--navy);color:#fff}
+.topbar .lang-links{margin-left:auto;margin-right:12px}
+.auth-first-page{position:relative}
+.auth-first-page>.lang-links{position:absolute;top:16px;right:16px;z-index:5}
+
+/* Registration chips: the checkbox must stay hidden inside .auth-card (its "label input" rule is more specific), and the short interest chips sit two to a row on phones. */
+.auth-card .subject-choice input{display:none}
+.subject-grid.chip-grid{grid-template-columns:1fr 1fr}
+/* Links styled as buttons: no underline, keep the button text colour. */
+a.primary-btn,a.secondary-btn{color:#fff;text-decoration:none}
+a.ghost-btn{color:var(--navy);text-decoration:none}
+/* Sign-in / register header: logo + language switcher + button must fit a 375px phone without wrapping or clipping. */
+@media(max-width:420px){.topbar .small-logo{width:96px}.topbar .lang-links{margin-right:6px}.topbar .lang-links a{padding:6px 8px;min-width:30px}.topbar .ghost-btn{padding:9px 11px;font-size:11px;white-space:nowrap}}
+
+/* Registration onboarding: one question per screen. */
+.onb-top{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.onb-bar{height:4px;background:var(--line);border-radius:999px;overflow:hidden}
+.onb-bar i{display:block;height:100%;width:14%;background:var(--teal);border-radius:999px;transition:width .25s ease}
+.onb-q{font-size:22px;line-height:1.25;margin:0 0 14px}
+.onb-hint{font-size:12px;color:var(--muted);margin:-6px 0 12px}
+.onb-step[hidden]{display:none}
+.onb-error[hidden]{display:none}
+.onb-error{background:#fff0f0;color:#a33;border:1px solid #f2cccc;padding:10px;border-radius:10px;font-size:12px;margin:14px 0 0}
+.onb-nav{display:flex;gap:10px;align-items:center;margin-top:22px}
+.onb-nav .ghost-btn{flex:none}
+.onb-nav .primary-btn{margin-top:0;flex:1}
+.onb-nav button[hidden]{display:none}

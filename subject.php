@@ -1,7 +1,9 @@
 <?php
 session_start();
+require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/subject-data.php';
 require_once __DIR__ . '/assessment-relevance-data.php';
+require_once __DIR__ . '/includes/profile.php';
 
 $grades      = sj_grades();
 $languages   = sj_languages();
@@ -14,24 +16,32 @@ $results = null;
 $errors  = [];
 $old     = $_POST ?? [];
 
-// TODO(db): once a database is connected, a returning Grade 11 learner
-// already has subjects (and often marks) on record from Grade 10 — pull
-// those and pre-fill the wizard instead of making them re-enter
-// everything from scratch. Left commented out until then; the manual
-// flow below is what actually runs for every grade right now.
-//
-// if ($_SERVER['REQUEST_METHOD'] !== 'POST' && ($_SESSION['user']['grade'] ?? '') === 'Grade 11') {
-//     $stmt = $pdo->prepare(
-//         'SELECT subjects, marks FROM assessments WHERE user_id = ? ORDER BY id DESC LIMIT 1'
-//     );
-//     $stmt->execute([$_SESSION['user']['id']]);
-//     $existing = $stmt->fetch();
-//     if ($existing) {
-//         $old['grade']   = 'Grade 11';
-//         $old['offered'] = json_decode($existing['subjects'], true) ?: [];
-//         $old['marks']   = json_decode($existing['marks'], true) ?: [];
-//     }
-// }
+// The shared learner profile (includes/profile.php) holds what the learner has
+// already told us — at registration or in an earlier run — so the wizard opens
+// pre-filled instead of asking again. A POST shows what was just submitted.
+$profile = profile_get();
+$prefilled = false;
+$suggestedKeys = []; // intended careers pre-selected from the Career Choice result
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $occupationKeys = array_keys($occupations);
+    $old = [
+        'grade'       => array_key_exists($profile['grade'], $grades) ? $profile['grade'] : '',
+        'hl'          => $profile['home_language'],
+        'fal'         => $profile['fal'],
+        'maths_track' => $profile['maths_track'],
+        'offered'     => array_values(array_intersect($profile['subjects'], $electives)),
+        'marks'       => [],
+        'intended'    => array_values(array_intersect($profile['intended_careers'], $occupationKeys)),
+    ];
+    foreach ($profile['marks'] as $subject => $mark) $old['marks'][$subject] = sj_band_for_mark((int)$mark);
+    $prefilled = (bool)array_filter([$old['grade'], $old['hl'], $old['fal'], $old['maths_track'], $old['offered']]);
+
+    // No intended careers yet, but Career Choice has been done: start from its top 3.
+    if (!$old['intended'] && !empty($profile['career_quiz']['top_careers'])) {
+        $suggestedKeys = array_slice(array_values(array_intersect($profile['career_quiz']['top_careers'], $occupationKeys)), 0, 3);
+        $old['intended'] = $suggestedKeys;
+    }
+}
 
 /**
  * Builds the full results array from a set of wizard inputs. Shared by
@@ -65,9 +75,13 @@ function sj_build_results(string $grade, string $hl, string $fal, string $maths,
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'swap') {
-    // Grade 11+ swap explorer: re-render the last wizard result from
-    // session, plus a comparison for the subject swap they just asked about.
-    $base = $_SESSION['subject_tool'] ?? null;
+    // Grade 11+ swap explorer: re-render the last wizard result from the
+    // profile, plus a comparison for the subject swap they just asked about.
+    // The wizard has been run once when grade, languages and Maths track are all on file.
+    $base = ($profile['grade'] !== '' && $profile['home_language'] !== '' && $profile['fal'] !== '' && $profile['maths_track'] !== '') ? [
+        'grade' => $profile['grade'], 'hl' => $profile['home_language'], 'fal' => $profile['fal'], 'maths' => $profile['maths_track'],
+        'selectedSubjects' => $profile['subjects'], 'marks' => $profile['marks'], 'intended' => $profile['intended_careers'],
+    ] : null;
     if ($base) {
         $swapFrom = $_POST['swap_from'] ?? '';
         $swapTo   = $_POST['swap_to'] ?? '';
@@ -115,39 +129,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'swap'
             }
         }
 
+        // Everything answered here goes back into the shared profile, so no
+        // other page has to ask for it again.
+        $intendedKeys = $unsure ? [] : array_values(array_intersect($intended, array_keys($occupations)));
+        profile_update([
+            'grade' => $grade, 'home_language' => $hl, 'fal' => $fal, 'maths_track' => $maths,
+            'subjects' => $selectedSubjects, 'marks' => $marks, 'intended_careers' => $intendedKeys,
+        ]);
+        $profile = profile_get();
+
         if ($unsure) {
             $results = [
                 'unsure' => true, 'mathsCloses' => sj_maths_track_closes($maths),
                 'grade' => $grade, 'hl' => $hl, 'fal' => $fal, 'maths' => $maths,
                 'selectedSubjects' => $selectedSubjects, 'marks' => $marks,
             ];
-            unset($_SESSION['subject_tool']);
         } else {
-            $intendedKeys = array_values(array_intersect($intended, array_keys($occupations)));
             $results = sj_build_results($grade, $hl, $fal, $maths, $selectedSubjects, $marks, $intendedKeys);
-
-            // Saved so the Grade 11+ swap explorer can re-run this same
-            // picture without asking the learner to redo the whole wizard.
-            $_SESSION['subject_tool'] = [
-                'grade' => $grade, 'hl' => $hl, 'fal' => $fal, 'maths' => $maths,
-                'selectedSubjects' => $selectedSubjects, 'marks' => $marks, 'intended' => $intendedKeys,
-            ];
         }
     }
 }
 
-// Diagnostic mode (Gr 11-12 / Post-school): subjects are fixed, so the
-// swap tool is pointless — Alternative pathways becomes the main way
-// forward instead of a footer link.
+// Already filled in? A learner who has finished Subject Chooser (grade, both
+// languages, Maths track and careers all on file) goes straight to their
+// results instead of back through the wizard. "Start over" (?restart=1) opens
+// the wizard, pre-filled from the profile, for anyone who wants to change something.
+$fromSaved = false;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_GET['restart'])
+    && $profile['grade'] !== '' && $profile['home_language'] !== '' && $profile['fal'] !== ''
+    && $profile['maths_track'] !== '' && !empty($profile['intended_careers'])) {
+    $results = sj_build_results($profile['grade'], $profile['home_language'], $profile['fal'], $profile['maths_track'],
+        $profile['subjects'], $profile['marks'], $profile['intended_careers']);
+    $fromSaved = true;
+}
+
+// Diagnostic mode (Gr 11-12 / Post-school): subjects are fixed, so
+// Alternative pathways becomes the main way forward instead of a footer link.
 $mode = $results ? ar_subject_chooser_mode($results['grade']) : null;
 
 // Gr 9/10 without a Career Choice result yet: offer (skippable) to do
 // that first, since Subject Chooser at these grades works backwards
 // from a career target. Only relevant before the wizard is submitted.
-$needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($_SESSION['user']['grade'] ?? '', isset($_SESSION['career_quiz']));
+$needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($profile['grade'], $profile['career_quiz']['code'] !== '');
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<?= kp_lang() ?>">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
@@ -178,6 +204,22 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($_SESSION
 
             <div id="subjectWizardWrap" class="<?= $needsCareerFirst ? 'd-none' : '' ?>">
             <?php if ($results): ?>
+
+                <div class="card mb-3 border-primary">
+                    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                        <div class="flex-grow-1" style="min-width:220px">
+                            <div class="fw-semibold"><?= $fromSaved ? 'Welcome back: these are your saved results' : 'Your results' ?></div>
+                            <div class="text-muted small">
+                                Built from the answers in your profile:
+                                <?= htmlspecialchars($results['grade']) ?> &middot; <?= htmlspecialchars($results['maths']) ?> &middot;
+                                <?= count($results['selectedSubjects']) ?> subject<?= count($results['selectedSubjects']) === 1 ? '' : 's' ?>
+                                <?php if (!empty($results['intendedLabels'])): ?>&middot; <?= count($results['intendedLabels']) ?> career<?= count($results['intendedLabels']) === 1 ? '' : 's' ?> you're aiming for<?php endif; ?>.
+                                Want to change something? Start over and we'll fill in what you've already told us, so you only edit what's different.
+                            </div>
+                        </div>
+                        <a href="subject.php?restart=1" class="btn btn-outline-primary btn-sm">Start over</a>
+                    </div>
+                </div>
 
                 <?php if ($results['unsure']): ?>
                     <div class="alert alert-info">
@@ -337,110 +379,91 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($_SESSION
                         if ($mode === AR_MODE_DIAGNOSTIC) echo $pathwaysHtml;
                     ?>
 
-                    <?php if (!empty($results['intendedLabels'])): ?>
-                    <div class="card mb-3 border-primary">
-                        <div class="card-header bg-primary-subtle d-flex flex-wrap justify-content-between align-items-center gap-2">
-                            <span>Subjects for the career path you want</span>
-                            <span class="badge text-bg-success">Opens <?= (int)$results['forward']['opensCount'] ?> of <?= count($results['intendedLabels']) ?> careers you picked</span>
-                        </div>
+                    <?php
+                        // Subjects the picked careers need that the learner isn't taking:
+                        // offered first when choosing what to swap in.
+                        $needed = array_values(array_diff($results['forward']['package'] ?? [], $results['selectedSubjects']));
+                        $canSwap = !empty($results['selectedSubjects']);
+                    ?>
+                    <div class="card mb-3">
+                        <div class="card-header">Swap a subject</div>
                         <div class="card-body">
-                            <p class="mb-3">For <strong><?= htmlspecialchars(implode(', ', $results['intendedLabels'])) ?></strong>, these elective subjects matter most:</p>
-                            <?php $missing = array_values(array_diff($results['forward']['package'], $results['selectedSubjects'])); ?>
-                            <ul class="list-group mb-3">
-                                <?php foreach ($results['forward']['package'] as $c): ?>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        <?= htmlspecialchars($c) ?>
-                                        <?php if (in_array($c, $missing, true)): ?><span class="badge text-bg-warning">Missing</span><?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-
-                            <p class="mb-2">On top of that, every learner also takes these compulsory subjects:</p>
-                            <ul class="list-group mb-3">
-                                <?php foreach ($results['forward']['compulsory'] as $c): ?>
-                                    <li class="list-group-item text-muted"><?= htmlspecialchars($c) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-
-                            <?php if ($results['forward']['conflict']): ?>
-                                <div class="alert alert-danger">
-                                    <strong>Trade-off:</strong> your chosen careers need <?= count($results['forward']['requiredElectives']) ?> required elective subjects, but CAPS only gives you 3 elective slots:
-                                    <?= htmlspecialchars(implode(', ', $results['forward']['requiredElectives'])) ?>.
-                                    You'll need to drop one of your intended careers, or accept that one of them stays partly closed.
-                                </div>
+                            <p class="text-muted small">Wondering what would change if you dropped a subject, or swapped it for another? See which careers it opens or closes. Nothing is saved.</p>
+                            <?php if ($mode === AR_MODE_DIAGNOSTIC): ?>
+                                <p class="text-muted small">Your subjects are already set at this grade, so use this to explore rather than to change them.</p>
                             <?php endif; ?>
 
-                            <?php if (!empty($missing)): ?>
-                                <?php if ($mode === AR_MODE_DIAGNOSTIC): ?>
-                                    <p class="text-muted small mb-0">You're missing <strong><?= htmlspecialchars(implode(', ', $missing)) ?></strong>, but your subjects are already set — swapping isn't an option now. See <strong>Alternative pathways</strong> below for other ways in.</p>
-                                <?php elseif (!empty($results['selectedSubjects'])): ?>
-                                    <p class="text-muted small mb-2">You're missing <strong><?= htmlspecialchars(implode(', ', $missing)) ?></strong> from what you're currently taking.</p>
-                                    <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#swapModal">Swap a subject</button>
-                                    <?php if (isset($errors['swap'])): ?><div class="text-danger small mt-2"><?= $errors['swap'] ?></div><?php endif; ?>
+                            <?php if ($canSwap): ?>
+                                <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#swapModal">Swap a subject</button>
+                                <?php if (isset($errors['swap'])): ?><div class="text-danger small mt-2"><?= $errors['swap'] ?></div><?php endif; ?>
 
-                                    <div class="modal fade" id="swapModal" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">Swap a subject</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <p class="text-muted small">See what dropping one of your current subjects for one of the missing ones above would actually change.</p>
+                                <div class="modal fade" id="swapModal" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Swap a subject</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p class="text-muted small">Pick a subject you take and, if you like, one to swap in instead. We'll show which careers open or close.</p>
 
-                                                    <?php if (isset($results['swap'])): ?>
-                                                        <div class="alert alert-secondary py-2">
-                                                            <strong>Dropping <?= htmlspecialchars($results['swap']['from']) ?><?= $results['swap']['to'] ? ' and adding ' . htmlspecialchars($results['swap']['to']) : '' ?>:</strong>
-                                                            <?php if (empty($results['swap']['opened']) && empty($results['swap']['closed'])): ?>
-                                                                <p class="mb-0 mt-2">No change. Every career's status stays the same.</p>
-                                                            <?php else: ?>
-                                                                <?php if (!empty($results['swap']['opened'])): ?>
-                                                                    <p class="mb-1 mt-2 text-success">Opens: <?= htmlspecialchars(implode(', ', array_column($results['swap']['opened'], 'label'))) ?></p>
-                                                                <?php endif; ?>
-                                                                <?php if (!empty($results['swap']['closed'])): ?>
-                                                                    <p class="mb-0 text-danger">Closes: <?= htmlspecialchars(implode(', ', array_column($results['swap']['closed'], 'label'))) ?></p>
-                                                                <?php endif; ?>
+                                                <?php if (isset($results['swap'])): ?>
+                                                    <div class="alert alert-secondary py-2">
+                                                        <strong>Dropping <?= htmlspecialchars($results['swap']['from']) ?><?= $results['swap']['to'] ? ' and adding ' . htmlspecialchars($results['swap']['to']) : '' ?>:</strong>
+                                                        <?php if (empty($results['swap']['opened']) && empty($results['swap']['closed'])): ?>
+                                                            <p class="mb-0 mt-2">No change. Every career's status stays the same.</p>
+                                                        <?php else: ?>
+                                                            <?php if (!empty($results['swap']['opened'])): ?>
+                                                                <p class="mb-1 mt-2 text-success">Opens: <?= htmlspecialchars(implode(', ', array_column($results['swap']['opened'], 'label'))) ?></p>
                                                             <?php endif; ?>
-                                                        </div>
-                                                    <?php endif; ?>
+                                                            <?php if (!empty($results['swap']['closed'])): ?>
+                                                                <p class="mb-0 text-danger">Closes: <?= htmlspecialchars(implode(', ', array_column($results['swap']['closed'], 'label'))) ?></p>
+                                                            <?php endif; ?>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
 
-                                                    <form method="post" action="subject.php" class="row g-2 align-items-end">
-                                                        <input type="hidden" name="action" value="swap">
-                                                        <div class="col-12">
-                                                            <label class="form-label small mb-1" for="swap_from">Subject to drop</label>
-                                                            <select class="form-select form-select-sm" name="swap_from" id="swap_from">
-                                                                <?php foreach ($results['selectedSubjects'] as $s): ?>
-                                                                    <option value="<?= htmlspecialchars($s) ?>" <?= (($old['swap_from'] ?? '') === $s) ? 'selected' : '' ?>><?= htmlspecialchars($s) ?></option>
-                                                                <?php endforeach; ?>
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-12">
-                                                            <label class="form-label small mb-1" for="swap_to">Swap in instead</label>
-                                                            <select class="form-select form-select-sm" name="swap_to" id="swap_to">
-                                                                <option value="">Just drop it</option>
-                                                                <?php foreach ($missing as $m): ?>
-                                                                    <option value="<?= htmlspecialchars($m) ?>" <?= (($old['swap_to'] ?? $missing[0]) === $m) ? 'selected' : '' ?>><?= htmlspecialchars($m) ?></option>
-                                                                <?php endforeach; ?>
-                                                                <?php foreach ($electives as $e): if (in_array($e, $results['selectedSubjects'], true) || in_array($e, $missing, true)) continue; ?>
+                                                <form method="post" action="subject.php" class="row g-2 align-items-end">
+                                                    <input type="hidden" name="action" value="swap">
+                                                    <div class="col-12">
+                                                        <label class="form-label small mb-1" for="swap_from">Subject to drop</label>
+                                                        <select class="form-select form-select-sm" name="swap_from" id="swap_from">
+                                                            <?php foreach ($results['selectedSubjects'] as $s): ?>
+                                                                <option value="<?= htmlspecialchars($s) ?>" <?= (($old['swap_from'] ?? '') === $s) ? 'selected' : '' ?>><?= htmlspecialchars($s) ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <label class="form-label small mb-1" for="swap_to">Swap in instead</label>
+                                                        <select class="form-select form-select-sm" name="swap_to" id="swap_to">
+                                                            <option value="">Just drop it</option>
+                                                            <?php if ($needed): ?>
+                                                                <optgroup label="Needed for the careers you picked">
+                                                                    <?php foreach ($needed as $m): ?>
+                                                                        <option value="<?= htmlspecialchars($m) ?>" <?= (($old['swap_to'] ?? $needed[0]) === $m) ? 'selected' : '' ?>><?= htmlspecialchars($m) ?></option>
+                                                                    <?php endforeach; ?>
+                                                                </optgroup>
+                                                            <?php endif; ?>
+                                                            <optgroup label="Other subjects">
+                                                                <?php foreach ($electives as $e): if (in_array($e, $results['selectedSubjects'], true) || in_array($e, $needed, true)) continue; ?>
                                                                     <option value="<?= htmlspecialchars($e) ?>" <?= (($old['swap_to'] ?? '') === $e) ? 'selected' : '' ?>><?= htmlspecialchars($e) ?></option>
                                                                 <?php endforeach; ?>
-                                                            </select>
-                                                        </div>
-                                                        <div class="col-12">
-                                                            <button type="submit" class="btn btn-warning btn-sm w-100">Compare</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
+                                                            </optgroup>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-12">
+                                                        <button type="submit" class="btn btn-warning btn-sm w-100">Compare</button>
+                                                    </div>
+                                                </form>
                                             </div>
                                         </div>
                                     </div>
-                                <?php else: ?>
-                                    <p class="text-muted small mb-0">Tick your current subjects in step 4 to see if swapping one could get you there.</p>
-                                <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <p class="text-muted small mb-0">Tick your current subjects in step 4 to try a swap.</p>
                             <?php endif; ?>
                         </div>
                     </div>
-                    <?php endif; ?>
 
                     <div class="modal fade" id="careerModal" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
@@ -474,9 +497,11 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($_SESSION
 
                 <?php endif; ?>
 
-                <a href="subject.php" class="btn btn-outline-secondary">Start over</a>
-
             <?php else: ?>
+
+                <?php if ($prefilled): ?>
+                    <div class="alert alert-info py-2 small">We've filled this in from your profile. Change anything that's different.</div>
+                <?php endif; ?>
 
                 <?php if (!empty($errors)): ?>
                     <div class="alert alert-danger">Please fix the highlighted fields below.</div>
@@ -599,6 +624,9 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($_SESSION
                                 <input class="form-check-input" type="checkbox" name="unsure" id="unsure" value="1" <?= !empty($old['unsure']) ? 'checked' : '' ?>>
                                 <label class="form-check-label" for="unsure"><strong>I don't know yet</strong>, take me to Career Choice instead</label>
                             </div>
+                            <?php if ($suggestedKeys): ?>
+                                <p class="small text-primary mb-3"><strong>Suggested by your Career Choice result:</strong> <?= htmlspecialchars(implode(', ', array_map(fn($k) => $occupations[$k]['label'], $suggestedKeys))) ?>. Untick any that don't fit.</p>
+                            <?php endif; ?>
                             <div id="intendedGroup" class="accordion">
                                 <?php
                                 $byField = [];
@@ -618,7 +646,7 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($_SESSION
                                             <div class="accordion-body d-flex flex-wrap gap-2">
                                                 <?php foreach ($items as $it): ?>
                                                     <input type="checkbox" class="btn-check intended-check" name="intended[]" id="oc-<?= $it['key'] ?>" value="<?= $it['key'] ?>" autocomplete="off" <?= in_array($it['key'], (array)($old['intended'] ?? []), true) ? 'checked' : '' ?>>
-                                                    <label class="btn btn-outline-primary btn-sm" for="oc-<?= $it['key'] ?>"><?= htmlspecialchars($it['label']) ?></label>
+                                                    <label class="btn btn-outline-primary btn-sm" for="oc-<?= $it['key'] ?>"><?= htmlspecialchars($it['label']) ?><?php if (in_array($it['key'], $suggestedKeys, true)): ?> <span class="badge text-bg-light ms-1">Suggested</span><?php endif; ?></label>
                                                 <?php endforeach; ?>
                                             </div>
                                         </div>
