@@ -31,16 +31,13 @@ foreach (ar_ordered_assessments($grade) as $key) {
 </head>
 <body>
 <div class="app-shell">
-<header class="topbar">
- <a class="brand" href="index.php"><span class="brand-mark">K</span><span>Khetha <b>Path</b></span></a>
- <span class="status-pill" id="networkStatus">● Connected</span>
-</header>
+<?php include __DIR__ . '/assets/navbar.php'; ?>
 
 <main class="dashboard">
 <section class="welcome-row">
   <div><p class="eyebrow">MY CAREER JOURNEY</p><h1>Hi, <?=htmlspecialchars($name)?> 👋</h1>
   <p class="muted">You’re in <b><?=htmlspecialchars($grade)?></b>. Khetha is adapting your journey around your starting point.</p></div>
-  <a class="ghost-btn" href="ask.html">Ask Khetha ✦</a>
+  <a class="ghost-btn" href="ask.php">Ask Khetha ✦</a>
 </section>
 
 <section class="journey-strip">

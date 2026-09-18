@@ -61,21 +61,36 @@ $secondaryTiles = [
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>My Khetha Dashboard</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <link rel="stylesheet" href="assets/css/style.css">
     </head>
     <body>
         <?php include __DIR__ . '/assets/navbar.php'; ?>
 
-        <div class="container py-4">
+        <main class="dashboard dashboard-lite container">
 
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
-                <div>
-                    <h2 class="mb-1">Welcome back, <?= htmlspecialchars($first) ?></h2>
-                    <p class="text-muted mb-0">Your journey is personalised around your level, subjects and interests.</p>
+            <section class="hero-greeting">
+                <div class="hero-greeting-copy">
+                    <p class="eyebrow">MY KHETHA</p>
+                    <h1>Hi, <?= htmlspecialchars($first) ?>! 👋</h1>
+                    <p class="hero-tagline">Your journey is personalised around your level, subjects and interests.</p>
+                    <a class="primary-btn hero-cta" href="<?= htmlspecialchars($nextStep['href']) ?>"><?= htmlspecialchars($nextStep['title']) ?> <span>&rarr;</span></a>
                 </div>
-                <a href="ask.html" class="btn btn-outline-secondary btn-sm">Ask Khetha</a>
-            </div>
+                <div class="greeting-video-wrap" aria-label="Khetha greeting">
+                    <video class="greeting-video" autoplay muted loop playsinline preload="auto" poster="assets/images/khetha-logo.png">
+                        <source src="assets/media/khetha-greeting.mp4" type="video/mp4">
+                    </video>
+                    <div class="video-caption">Hi! I'm Khetha 👋</div>
+                </div>
+            </section>
 
-            <a href="<?= htmlspecialchars($nextStep['href']) ?>" class="card mb-4 text-decoration-none text-body border-primary">
+            <section class="quick-actions" aria-label="Quick actions">
+                <a href="subject.php"><span>📚</span><b>Subjects</b></a>
+                <a href="career-quiz.php"><span>🧭</span><b>Careers</b></a>
+                <a href="my-path.php"><span>🛣️</span><b>My Path</b></a>
+                <a href="ask.php"><span>✨</span><b>Ask Khetha</b></a>
+            </section>
+
+            <a href="<?= htmlspecialchars($nextStep['href']) ?>" class="card mb-4 text-decoration-none text-body border-primary mt-2">
                 <div class="card-body d-flex justify-content-between align-items-center gap-3">
                     <div class="d-flex align-items-center gap-3">
                         <i class="bi bi-map fs-3 text-primary"></i>
@@ -132,6 +147,8 @@ $secondaryTiles = [
                 <?php endforeach; ?>
             </div>
 
-        </div>
+            <p class="offline-hint">📥 Your Khetha journey is designed for low-data use and can keep key content available offline.</p>
+
+        </main>
     </body>
 </html>

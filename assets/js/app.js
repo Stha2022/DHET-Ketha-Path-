@@ -27,7 +27,7 @@ function ask(question) {
   const input = document.getElementById("question");
   addMessage(question, "user");
   if (input) input.value = "";
-  fetch("ask.php", {
+  fetch("ask-api.php", {
     method:"POST",
     headers:{"Content-Type":"application/x-www-form-urlencoded"},
     body:"question="+encodeURIComponent(question)

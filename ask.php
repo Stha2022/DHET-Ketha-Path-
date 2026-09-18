@@ -1,25 +1,35 @@
 <?php
 session_start();
-header('Content-Type: application/json');
-$q = strtolower(trim($_POST['question'] ?? ''));
-$name = $_SESSION['name'] ?? 'there';
-
-$response = "I can help you explore your journey. Try asking about a career, qualification, subjects, your next step, or a 'What If?' scenario.";
-$tag = "Journey guidance";
-
-if (str_contains($q, 'computer') || str_contains($q, 'coding') || str_contains($q, 'software')) {
-    $response = "If you enjoy computers and building things, Software Development is one pathway worth exploring. Khetha would next help you check relevant subjects, qualifications and learning providers before you decide.";
-    $tag = "Career exploration";
-} elseif (str_contains($q, 'qualify') || str_contains($q, 'don’t qualify') || str_contains($q, "don't qualify")) {
-    $response = "Not qualifying for your first route does not have to end the journey. Open What If? to compare alternative routes toward a related goal. The production version would calculate these alternatives from approved NCAP/DHET pathway data.";
-    $tag = "Pathway adaptation";
-} elseif (str_contains($q, 'why') || str_contains($q, 'suggest')) {
-    $response = "The prototype is using your starting context — your level, subjects and interests — to make the journey more personal. In production, Khetha should explain which approved data and rules contributed to every recommendation.";
-    $tag = "Explainability";
-} elseif (str_contains($q, 'next') || str_contains($q, 'what should')) {
-    $response = "Your next step is to explore the qualification routes connected to your chosen career, then compare learning providers. Khetha keeps those steps together instead of making you restart your search each time.";
-    $tag = "Next action";
-}
-
-echo json_encode(['answer'=>$response, 'tag'=>$tag, 'name'=>$name]);
+if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ask Khetha — AI Companion</title><link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<?php include __DIR__ . '/assets/navbar.php'; ?>
+<div class="app-shell">
+<main class="chat-page">
+<section class="chat-card">
+ <div class="companion-head large"><div class="avatar">K</div><div><small>KHETHA COMPANION</small><strong>Ask about your path</strong></div></div>
+ <div id="messages" class="messages">
+   <div class="bubble ai">Hi! I’m Khetha. Ask me about your <b>next step</b>, your <b>pathway</b>, or what happens if your circumstances change.</div>
+   <div class="suggestions">
+    <button onclick="ask('What can I study if I like computers?')">I like computers</button>
+    <button onclick="ask('What if I don’t qualify?')">What if I don’t qualify?</button>
+    <button onclick="ask('Why did you suggest this path?')">Why this path?</button>
+   </div>
+ </div>
+ <form id="askForm" class="ask-form">
+   <input id="question" placeholder="Ask Khetha something..." autocomplete="off" required>
+   <button class="primary-btn" type="submit">Ask →</button>
+ </form>
+ <p class="source-note">Prototype AI companion: responses are intentionally controlled for the demo. Production should use approved NCAP/DHET knowledge, retrieval, consent, logging, explainability and human escalation.</p>
+</section>
+</main>
+</div>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
