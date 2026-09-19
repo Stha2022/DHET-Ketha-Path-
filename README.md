@@ -5,7 +5,7 @@
 This branch exists only to deploy a live, clickable demo (e.g. on Render) without needing MySQL set up anywhere. Compared to `main`:
 
 - `register.php` and `login.php` no longer touch a database — a profile lives only in the browser session for that visit. Register with any details, or sign in with any email/password (nothing is checked or stored), and you get a fresh demo session.
-- `config/db.php` and `db-test.php` are removed (nothing on this branch needs them).
+- `config/db.php` and `db-test.php` are removed; database access uses `database/db-connection.php`.
 - A `Dockerfile` + `render.yaml` are included so Render can build and run this branch directly — see **Deploy on Render** below.
 
 **`main` still has the real MySQL-backed auth** (password hashing, `users`/`assessments`/`journey_events` tables) — that's the version to keep developing against locally with XAMPP. Don't merge `render-demo` back into `main`; it's a one-way deployment branch, cut from `main` and periodically re-cut when `main` moves forward.
@@ -74,7 +74,7 @@ The registration page is the point where personalisation begins.
 The previous prototype only stored registration data in `$_SESSION`. That is why phpMyAdmin showed an empty `users` table.
 
 This phase fixes that:
-- `config/db.php` connects PHP to the `khetha_path` MySQL database.
+- `database/db-connection.php` connects PHP to the `khetha_path` MySQL database.
 - Registration inserts the user into `users`.
 - Passwords are stored using `password_hash()` — never plain text.
 - Subjects and interests are inserted into `assessments`.
@@ -100,7 +100,7 @@ Import `database/migration_existing_users.sql` first. The old schema did not hav
    - `grade`
    - `consent_at`
    - `created_at`
-6. Check `config/db.php`. Default XAMPP is normally:
+6. Check `database/db-connection.php`. Default XAMPP is normally:
    - host: `127.0.0.1`
    - user: `root`
    - password: blank

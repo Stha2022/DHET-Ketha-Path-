@@ -19,6 +19,7 @@
 
 require_once __DIR__ . '/../occupation-data.php';
 require_once __DIR__ . '/../data/interests.php';
+require_once __DIR__ . '/../database/db-connection.php';
 
 const ADMIN_GRADE_LABELS = ['grade 9' => 'Grade 9', 'grade 10' => 'Grade 10', 'grade 11' => 'Grade 11', 'grade 12' => 'Grade 12', 'out of school' => 'Post-school'];
 const ADMIN_LOCKED_GRADES = ['grade 11', 'grade 12', 'out of school']; // subjects can no longer be changed

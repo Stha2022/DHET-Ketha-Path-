@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../database/db-connection.php';
 require_once __DIR__ . '/profile.php';
 
 function kp_log_event(int $userId, string $type, array $data = []): void {

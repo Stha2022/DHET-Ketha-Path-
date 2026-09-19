@@ -20,7 +20,7 @@
  * Only this file touches either.
  */
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../database/db-connection.php';
 require_once __DIR__ . '/profile.php';
 
 const ACCOUNT_SESSION_KEY = 'khetha_account';

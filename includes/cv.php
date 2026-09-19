@@ -23,7 +23,7 @@
  * occupation-data.php: the database `careers` table has integer ids and no slug to join on.
  */
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../database/db-connection.php';
 require_once __DIR__ . '/profile.php';
 require_once __DIR__ . '/../occupation-data.php';
 require_once __DIR__ . '/../subject-data.php';
@@ -38,7 +38,7 @@ const CV_DB_GRADES = ['grade 9' => 'Grade 9', 'grade 10' => 'Grade 10', 'grade 1
 // Connection
 // ---------------------------------------------------------------------------
 
-/** A live database connection, or null only when the database is unavailable (see includes/db.php). */
+/** A live database connection, or null only when the database is unavailable (see database/db-connection.php). */
 function cv_db(): ?mysqli {
     return kp_db();
 }

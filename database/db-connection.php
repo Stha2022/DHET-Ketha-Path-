@@ -2,6 +2,17 @@
 /** Khetha Path MySQL connection. Local XAMPP uses plain localhost; production can enable TLS. */
 mysqli_report(MYSQLI_REPORT_OFF);
 
+function kp_db(): ?mysqli {
+    global $conn;
+    return isset($conn) && $conn instanceof mysqli && !$conn->connect_errno ? $conn : null;
+}
+
+function kp_db_required(): mysqli {
+    $db = kp_db();
+    if (!$db) throw new RuntimeException('Khetha could not connect to MySQL. Start MySQL in XAMPP and import database/khetha_path.sql.');
+    return $db;
+}
+
 $envFile = __DIR__ . '/.env';
 if (is_file($envFile)) {
     foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {

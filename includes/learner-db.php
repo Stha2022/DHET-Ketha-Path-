@@ -18,7 +18,7 @@
  *     job_fit           derived {occupation_id, overall, flags}   (one row per occupation)
  */
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../database/db-connection.php';
 
 // The app says "Grade 10" / "Post-school"; users.grade is a lower-case enum.
 const LEARNER_DB_GRADES = ['Grade 9' => 'grade 9', 'Grade 10' => 'grade 10', 'Grade 11' => 'grade 11', 'Grade 12' => 'grade 12', 'Post-school' => 'out of school'];
