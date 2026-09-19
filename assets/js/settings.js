@@ -17,7 +17,21 @@
     catch (e) { return Object.assign({}, DEFAULTS); }
   };
   const save = s => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} };
+  const csrf = (document.querySelector('input[name="csrf"]') || {}).value || '';
+  const syncServer = async () => {
+    try {
+      const body = new URLSearchParams({action:'prefs', csrf:csrf, pushEnabled:settings.notify?'1':'', deadlineReminders:settings.notifyDeadlines?'1':'', assessmentReminders:settings.notifyAssessments?'1':'', journeyTips:settings.notifyTips?'1':''});
+      await fetch('api/notifications.php',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body,credentials:'same-origin',cache:'no-store'});
+    } catch(e) {}
+  };
   let settings = load();
+  if (window.KP_SERVER_SETTINGS) {
+    settings.notify = !!window.KP_SERVER_SETTINGS.pushEnabled;
+    settings.notifyDeadlines = !!window.KP_SERVER_SETTINGS.deadlineReminders;
+    settings.notifyAssessments = !!window.KP_SERVER_SETTINGS.assessmentReminders;
+    settings.notifyTips = !!window.KP_SERVER_SETTINGS.journeyTips;
+  }
+  save(settings);
 
   const say = (id, text) => { $(id).textContent = text; };
 
@@ -54,6 +68,7 @@
     if (!e.target.checked) {
       settings.notify = false;
       save(settings);
+      syncServer();
       return renderNotifications();
     }
     if (!supported) return renderNotifications();
@@ -63,6 +78,7 @@
     }
     settings.notify = p === "granted";
     save(settings);
+    syncServer();
     renderNotifications();
   });
 
@@ -85,6 +101,7 @@
     el.addEventListener("change", () => {
       settings[el.dataset.setting] = el.checked;
       save(settings);
+      syncServer();
     });
   });
 

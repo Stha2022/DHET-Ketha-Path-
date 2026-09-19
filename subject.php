@@ -1,9 +1,12 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/subject-data.php';
 require_once __DIR__ . '/assessment-relevance-data.php';
 require_once __DIR__ . '/includes/profile.php';
+require_once __DIR__ . '/includes/journey.php';
+require_once __DIR__ . '/includes/csrf.php';
+kp_require_auth();
 
 $grades      = sj_grades();
 $languages   = sj_languages();
@@ -75,6 +78,7 @@ function sj_build_results(string $grade, string $hl, string $fal, string $maths,
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'swap') {
+    if (!csrf_check($_POST['csrf'] ?? '')) $errors['swap'] = 'Your session expired. Refresh the page and try again.';
     // Grade 11+ swap explorer: re-render the last wizard result from the
     // profile, plus a comparison for the subject swap they just asked about.
     // The wizard has been run once when grade, languages and Maths track are all on file.
@@ -98,6 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'swap'
         $errors['swap'] = 'Start the wizard below first, then come back to try a swap.';
     }
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_check($_POST['csrf'] ?? '')) { $errors['csrf'] = 'Your session expired. Refresh the page and try again.'; }
     $grade  = $_POST['grade'] ?? '';
     $hl     = $_POST['hl'] ?? '';
     $fal    = $_POST['fal'] ?? '';
@@ -136,6 +141,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'swap'
             'grade' => $grade, 'home_language' => $hl, 'fal' => $fal, 'maths_track' => $maths,
             'subjects' => $selectedSubjects, 'marks' => $marks, 'intended_careers' => $intendedKeys,
         ]);
+        $profile = profile_get();
+        kp_record_assessment(kp_user_id(), 'subject_chooser', [
+            'grade'=>$grade,'home_language'=>$hl,'fal'=>$fal,'maths_track'=>$maths,
+            'subjects'=>$selectedSubjects,'marks'=>$marks,'intended_careers'=>$intendedKeys
+        ]);
+        kp_log_event(kp_user_id(),'subject_chooser_completed',['intended_count'=>count($intendedKeys)]);
         $profile = profile_get();
 
         if ($unsure) {
@@ -424,6 +435,7 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($profile[
                                                 <?php endif; ?>
 
                                                 <form method="post" action="subject.php" class="row g-2 align-items-end">
+                                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
                                                     <input type="hidden" name="action" value="swap">
                                                     <div class="col-12">
                                                         <label class="form-label small mb-1" for="swap_from">Subject to drop</label>
@@ -520,6 +532,7 @@ $needsCareerFirst = !$results && ar_subject_chooser_needs_career_first($profile[
                 </div>
 
                 <form method="post" action="subject.php" id="subjectForm" novalidate>
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
 
                     <div class="card mb-3 step-card" data-step="1">
                         <div class="card-body">

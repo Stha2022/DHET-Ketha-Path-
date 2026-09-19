@@ -1,11 +1,11 @@
 <?php
 // My CV: a CV started for the learner from what Khetha already knows. They can edit any of it;
 // their edits are kept separately (see includes/cv.php), and "Reset" goes back to what Khetha knows.
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/includes/cv.php';
 require_once __DIR__ . '/includes/csrf.php';
-if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
+kp_require_auth();
 
 $userId = (int)($_SESSION['user']['id'] ?? 0);
 $account = ['name' => $_SESSION['user']['name'] ?? '', 'email' => $_SESSION['user']['email'] ?? ''];

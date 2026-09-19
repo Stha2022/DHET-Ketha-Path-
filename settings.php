@@ -6,12 +6,15 @@
 // Demo mode: like the rest of the app there is no database, so the learner's
 // data is the PHP session plus this browser's storage. Device preferences
 // are kept in localStorage under "khetha-settings" (see assets/js/settings.js).
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
-require_once __DIR__ . '/includes/profile.php';
-if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
+require_once __DIR__ . '/includes/journey.php';
+require_once __DIR__ . '/includes/csrf.php';
+kp_require_auth();
 
 $u = $_SESSION['user'];
+$userId = kp_user_id();
+$notificationPrefs = kp_notification_preferences($userId);
 if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
 $csrf = $_SESSION['csrf'];
 
@@ -45,14 +48,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // With no database the session is all there is to delete. When accounts
-    // are stored, remove the learner's rows here before signing out.
+    if ($action === 'save_notification_preferences') {
+        kp_save_notification_preferences($userId, [
+            'pushEnabled' => isset($_POST['pushEnabled']),
+            'deadlineReminders' => isset($_POST['deadlineReminders']),
+            'assessmentReminders' => isset($_POST['assessmentReminders']),
+            'journeyTips' => isset($_POST['journeyTips']),
+        ]);
+        $_SESSION['settings_flash'] = t('Notification preferences saved.');
+        header('Location: settings.php#notifications'); exit;
+    }
+
     if ($action === 'delete') {
-        header('Location: logout.php');
-        exit;
+        $db = kp_db();
+        if ($db) {
+            $stmt = @$db->prepare('DELETE FROM users WHERE userID=?');
+            if ($stmt) { $stmt->bind_param('i',$userId); $stmt->execute(); $stmt->close(); }
+        }
+        header('Location: logout.php'); exit;
     }
 }
 
+$settingsFlash = $_SESSION['settings_flash'] ?? ''; unset($_SESSION['settings_flash']);
 $name = $u['name'] ?? t('Learner');
 $email = $u['email'] ?? '';
 
@@ -146,7 +163,7 @@ $policy = [
     <body>
         <?php include __DIR__ . '/assets/navbar.php'; ?>
 
-        <main class="dashboard narrow">
+        <main id="main-content" class="dashboard narrow">
             <p class="eyebrow"><?= t('YOUR APP') ?></p>
             <h1><?= t('Settings') ?></h1>
             <p class="muted mb-4"><?= t('Control notifications, language, data use and your privacy. Your name, grade and subjects live in My Profile.') ?></p>
@@ -173,7 +190,7 @@ $policy = [
                         </div>
                     </div>
                     <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="notify" aria-labelledby="notify-label" data-setting="notify">
+                        <input class="form-check-input" type="checkbox" role="switch" id="notify" aria-labelledby="notify-label" data-setting="notify" <?= $notificationPrefs['pushEnabled'] ? 'checked' : '' ?>>
                     </div>
                 </div>
 
@@ -199,7 +216,17 @@ $policy = [
                 </div>
                 <p class="settings-status" id="notify-status" role="status" aria-live="polite"></p>
                 <div class="settings-note" id="notify-ios" hidden><?= t('On iPhone and iPad, notifications only work once Khetha is added to your Home Screen: tap Share, then Add to Home Screen, and open it from there.') ?></div>
-                <p class="settings-lede mt-2 mb-0"><?= t('These choices are saved on this device only. Notifications delivered while the app is closed are not switched on yet, so for now you will see them while Khetha is open.') ?></p>
+                <form method="post" class="settings-actions" id="notificationPrefsForm">
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+                    <input type="hidden" name="action" value="save_notification_preferences">
+                    <input type="hidden" name="pushEnabled" value="1" id="pushEnabledField">
+                    <input type="hidden" name="deadlineReminders" value="1" id="deadlineField">
+                    <input type="hidden" name="assessmentReminders" value="1" id="assessmentField">
+                    <input type="hidden" name="journeyTips" value="1" id="tipsField">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-check"></i> <?= t('Save notification preferences') ?></button>
+                </form>
+                <?php if ($settingsFlash): ?><p class="settings-status text-success" role="status"><?= htmlspecialchars($settingsFlash) ?></p><?php endif; ?>
+                <p class="settings-lede mt-2 mb-0"><?= t('Your preferences are stored with your account. Device permission is separate: the browser or native app must also allow notifications.') ?></p>
             </section>
 
             <!-- Language -->
@@ -343,6 +370,14 @@ $policy = [
             'cleared'       => t('Saved pages cleared. They will be saved again the next time you open your dashboard.'),
             'clearedNone'   => t('There were no saved pages to clear.'),
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
-        <script src="assets/js/settings.js"></script>
+        <script>
+(function(){
+  var map={pushEnabledField:'notify',deadlineField:'notifyDeadlines',assessmentField:'notifyAssessments',tipsField:'notifyTips'};
+  var f=document.getElementById('notificationPrefsForm'); if(!f)return;
+  f.addEventListener('submit',function(){Object.keys(map).forEach(function(k){var x=document.getElementById(k),c=document.getElementById(map[k]);x.disabled=!c.checked;});});
+})();
+</script>
+<script>window.KP_SERVER_SETTINGS = <?= json_encode($notificationPrefs, JSON_UNESCAPED_UNICODE) ?>;</script>
+<script src="assets/js/settings.js"></script>
     </body>
 </html>

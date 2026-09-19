@@ -1,7 +1,7 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
-if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
+kp_require_auth();
 ?>
 <!DOCTYPE html>
 <html lang="<?= kp_lang() ?>">
@@ -12,7 +12,7 @@ if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
 <body>
 <?php include __DIR__ . '/assets/navbar.php'; ?>
 <div class="app-shell">
-<main class="chat-page">
+<main id="main-content" class="chat-page">
 <section class="chat-card">
  <div class="companion-head large"><div class="avatar">K</div><div><small><?= t('KHETHA COMPANION') ?></small><strong><?= t('Ask about your path') ?></strong></div></div>
  <div id="messages" class="messages">

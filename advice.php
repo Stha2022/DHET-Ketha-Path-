@@ -1,23 +1,2 @@
-<?php session_start(); require_once __DIR__ . '/assets/lang.php'; ?>
-<!doctype html>
-<html lang="<?= kp_lang() ?>">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><?php include __DIR__ . "/assets/pwa-head.php"; ?>
-<title><?= t('Career Advice') ?></title>
-<link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body>
-<?php include __DIR__ . '/assets/navbar.php'; ?>
-<main class="dashboard narrow">
-  <p class="eyebrow"><?= t('HUMAN SUPPORT') ?></p>
-  <h1><?= t('Sometimes you need a person.') ?></h1>
-  <p class="lead"><?= t('Keep official career advice, events and human practitioner contact easy to reach.') ?></p>
-  <div class="support-grid">
-    <div class="support-card"><b><?= t('Find a Career Advisor') ?></b><p><?= t('Find advice and practitioner channels.') ?></p></div>
-    <a class="support-card" href="contact-advisor.php" style="display:block;color:inherit"><b><?= t('Khetha Contact') ?></b><p><?= t('Send a request and a Career Advisor will follow up with you.') ?></p></a>
-    <div class="support-card"><b><?= t('Events') ?></b><p><?= t('Discover career guidance events.') ?></p></div>
-  </div>
-</main>
-</body>
-</html>
+<?php require_once __DIR__.'/includes/auth.php'; require_once __DIR__.'/assets/lang.php'; require_once __DIR__.'/includes/journey.php'; kp_require_auth(); kp_log_event(kp_user_id(),'advice_opened'); ?>
+<!doctype html><html lang="<?=kp_lang()?>"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><?php include __DIR__.'/assets/pwa-head.php'; ?><title><?=t('Career Advice')?></title><link rel="stylesheet" href="assets/css/style.css"></head><body><?php include __DIR__.'/assets/navbar.php'; ?><main id="main-content" class="dashboard narrow"><p class="eyebrow">HUMAN SUPPORT</p><h1><?=t('Sometimes you need a person.')?></h1><p class="lead"><?=t('Keep official career advice, events and human practitioner contact easy to reach.')?></p><div class="support-grid"><a class="support-card" href="contact-advisor.php"><b><?=t('Find a Career Advisor')?></b><p><?=t('Send a request and keep a record of your support request.')?></p></a><a class="support-card" href="https://ncap.careerhelp.org.za/" target="_blank" rel="noopener"><b><?=t('Open NCAP')?></b><p><?=t('Access the official National Career Advice Portal reference site.')?></p></a><a class="support-card" href="mailto:careerhelp@dhet.gov.za"><b><?=t('Email Khetha / DHET')?></b><p>careerhelp@dhet.gov.za</p></a></div><div class="support-grid" style="margin-top:12px"><a class="support-card" href="tel:0869990123"><b>📞 086 999 0123</b><p><?=t('Career advice line')?></p></a><a class="support-card" href="tel:0722045056"><b>📱 072 204 5056</b><p><?=t('Career advice contact')?></p></a><a class="support-card" href="ncap.php"><b>🏛️ NCAP alignment</b><p><?=t('See how the Khetha Path experience maps to NCAP.')?></p></a></div></main></body></html>

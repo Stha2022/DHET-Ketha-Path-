@@ -142,3 +142,15 @@ Implements the Subject Choice decision from NCAP's Self Exploration set, combini
 - `reset-subject-choice.php` — clears saved answers for all three questionnaires.
 
 All of the above require a signed-in learner (`$_SESSION['user']`, set by `login.php`); progress is stored in `$_SESSION['subject_choice']` only — it is not yet persisted to MySQL.
+
+
+## Phase 11 visual refresh
+The UI now uses a consistent Khetha + Department of Higher Education and Training brand lockup, a colourful mobile-first dashboard, animated micro-interactions, and the local Khetha greeting video. The DHET logo supplied for the hackathon is stored at `assets/images/dhet-official-logo.png`.
+
+## GovTech 2026 final build additions
+
+This build includes a complete importable `database/khetha_path.sql`, persistent MySQL accounts and learner profiles, account-backed notifications/reminders, NCAP alignment mapping, searchable Careers/What to Study/Where to Study directories, persistent favourites, functional advisor-request storage, accessibility enhancements, and Capacitor 8 native local-notification integration.
+
+Prototype content in `occupation-data.php` and the seeded reference tables is explicitly labelled as prototype content. Production should synchronise approved NCAP/DHET data through an authorised integration/API.
+
+See `FINAL-TEST-CHECKLIST.md` for the test sequence.

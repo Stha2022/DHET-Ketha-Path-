@@ -1,10 +1,10 @@
 -- Khetha Path — sample learners so the admin dashboard has something to show.
 -- NOT run automatically. Apply by hand to the khetha_path database.
 --
--- All sample learners use @seed.khetha.test emails and userIDs 9001-9012, so they are easy
+-- All sample learners use @seed.khetha.test emails and userIDs 9001-9014, so they are easy
 -- to remove:  DELETE FROM users WHERE email LIKE '%@seed.khetha.test';
 -- (assessmentResults rows are removed with them only if the foreign key cascades; otherwise run
---  DELETE FROM assessmentResults WHERE userID BETWEEN 9001 AND 9012; first.)
+--  DELETE FROM assessmentResults WHERE userID BETWEEN 9001 AND 9014; first.)
 -- The password hash is a placeholder that matches no password, so these accounts cannot sign in.
 
 INSERT INTO users (userID, firstName, lastName, email, grade, passwordHash, consentAt) VALUES
@@ -20,6 +20,11 @@ INSERT INTO users (userID, firstName, lastName, email, grade, passwordHash, cons
  (9010,'Sample','Learner10','l10@seed.khetha.test','grade 9','!',NOW()),
  (9011,'Sample','Learner11','l11@seed.khetha.test','grade 12','!',NOW()),
  (9012,'Sample','Learner12','l12@seed.khetha.test','out of school','!',NOW());
+
+-- Two learners who signed up weeks ago and never used a tool (early-warning: inactive / no direction).
+INSERT INTO users (userID, firstName, lastName, email, grade, passwordHash, consentAt, createdAt) VALUES
+ (9013,'Sample','Learner13','l13@seed.khetha.test','grade 12','!',NOW(),NOW() - INTERVAL 30 DAY),
+ (9014,'Sample','Learner14','l14@seed.khetha.test','grade 10','!',NOW(),NOW() - INTERVAL 20 DAY);
 
 -- Subject Chooser results: the subjects/marks each learner has and the careers they are aiming for.
 INSERT INTO assessmentResults (userID, source, payload, derived) VALUES
@@ -47,4 +52,5 @@ INSERT INTO assessmentResults (userID, source, payload, derived) VALUES
  (9002,'job_fit',NULL,'{"occupation_id":"chartered_accountancy","overall":64,"flags":["This job leans heavily on numerical reasoning — an area you rated yourself lower on.","Recognition matters to you, but this job doesn''t offer much of it."]}'),
  (9004,'job_fit',NULL,'{"occupation_id":"civil_engineering","overall":82,"flags":[]}'),
  (9005,'job_fit',NULL,'{"occupation_id":"architecture","overall":58,"flags":["This job leans heavily on numerical reasoning — an area you rated yourself lower on.","This job leans heavily on spatial reasoning — an area you rated yourself lower on."]}'),
+ (9006,'job_fit',NULL,'{"occupation_id":"chartered_accountancy","overall":42,"flags":["Independence matters to you, but this job doesn''t offer much of it."]}'),
  (9012,'job_fit',NULL,'{"occupation_id":"electrician","overall":76,"flags":["This job involves physically demanding work. You said that would bother you."]}');

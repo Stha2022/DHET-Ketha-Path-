@@ -1,4 +1,4 @@
-const VERSION = "v10";
+const VERSION = "v12";
 const STATIC_CACHE = "khetha-static-" + VERSION;
 const PAGE_CACHE = "khetha-pages-" + VERSION;
 
@@ -6,7 +6,7 @@ const PAGE_CACHE = "khetha-pages-" + VERSION;
 const SHELL = [
     "offline.html",
     "assets/css/style.css", "assets/js/app.js", "assets/js/pwa.js",
-    "assets/images/khetha-logo.png", "assets/images/icon-192.png", "assets/images/icon-512.png",
+    "assets/images/khetha-logo.png", "assets/images/dhet-official-logo.png", "assets/media/khetha-greeting.mp4", "assets/images/icon-192.png", "assets/images/icon-512.png",
     "manifest.json",
 ];
 
@@ -22,7 +22,7 @@ const CDN = [
 // dashboard (see assets/js/pwa.js).
 const WARM_PAGES = [
     "dashboard.php", "subject.php", "career-quiz.php", "occupation.php", "my-path.php",
-    "directories.php", "favourites.php", "advice.php", "what-if.php", "contact-advisor.php", "ask.php", "settings.php",
+    "directories.php", "favourites.php", "advice.php", "what-if.php", "contact-advisor.php", "notifications.php", "ncap.php", "ask.php", "settings.php",
 ];
 
 const STATIC_RE = /\.(css|js|png|jpe?g|svg|webp|ico|gif|woff2?|json)$/;

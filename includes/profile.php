@@ -100,12 +100,39 @@ function profile_completion(): array {
 }
 
 // ---------------------------------------------------------------------------
-// Storage — the only code that touches the session. Swap these two for MySQL.
+// Storage — MySQL is the persistent source of truth; session is the offline/demo
+// fallback. A single JSON profile keeps the prototype schema stable while the
+// individual assessment pages continue to use their own result structures.
 // ---------------------------------------------------------------------------
 
-/** @return array|null The stored profile, or null if none exists yet. */
 function _profile_load(): ?array {
     _profile_session();
+    $id = (int)($_SESSION['user']['id'] ?? 0);
+    if ($id > 0) {
+        require_once __DIR__ . '/db.php';
+        $db = kp_db();
+        if ($db) {
+            $stmt = @$db->prepare('SELECT profileData FROM learner_profiles WHERE userID=? LIMIT 1');
+            if ($stmt) {
+                $stmt->bind_param('i', $id);
+                if ($stmt->execute() && ($res = $stmt->get_result()) && ($row = $res->fetch_assoc())) {
+                    $decoded = json_decode((string)$row['profileData'], true);
+                    if (is_array($decoded)) return $decoded;
+                }
+                $stmt->close();
+            }
+            // Graceful recovery for an account created before learner_profiles existed.
+            $stmt = @$db->prepare('SELECT firstName,lastName,grade,interests FROM users WHERE userID=? LIMIT 1');
+            if ($stmt) {
+                $stmt->bind_param('i',$id);
+                if ($stmt->execute() && ($res=$stmt->get_result()) && ($u=$res->fetch_assoc())) {
+                    $ints=json_decode((string)($u['interests']??''),true);
+                    return ['name'=>trim($u['firstName'].' '.$u['lastName']), 'grade'=>(string)($u['grade']??''), 'interests'=>is_array($ints)?$ints:[]];
+                }
+                $stmt->close();
+            }
+        }
+    }
     return isset($_SESSION[PROFILE_SESSION_KEY]) && is_array($_SESSION[PROFILE_SESSION_KEY])
         ? $_SESSION[PROFILE_SESSION_KEY] : null;
 }
@@ -113,6 +140,32 @@ function _profile_load(): ?array {
 function _profile_save(array $profile): void {
     _profile_session();
     $_SESSION[PROFILE_SESSION_KEY] = $profile;
+    $id = (int)($_SESSION['user']['id'] ?? 0);
+    if ($id <= 0) return;
+
+    require_once __DIR__ . '/db.php';
+    $db = kp_db();
+    if (!$db) return;
+
+    $json = json_encode($profile, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) return;
+
+    $stmt = @$db->prepare('INSERT INTO learner_profiles (userID,profileData) VALUES (?,?) ON DUPLICATE KEY UPDATE profileData=VALUES(profileData)');
+    if ($stmt) {
+        $stmt->bind_param('is', $id, $json);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    // Keep the account-level fields queryable without opening the profile JSON.
+    $grade = (string)($profile['grade'] ?? '');
+    $interests = json_encode(array_values((array)($profile['interests'] ?? [])), JSON_UNESCAPED_UNICODE);
+    $stmt = @$db->prepare('UPDATE users SET grade=?, interests=? WHERE userID=?');
+    if ($stmt) {
+        $stmt->bind_param('ssi', $grade, $interests, $id);
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 function _profile_session(): void {

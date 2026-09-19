@@ -1,11 +1,11 @@
 <?php
 // My Profile: the basics a learner can change after signing up — grade, Maths
 // track and interest chips. Everything is saved to the shared profile.
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/includes/profile.php';
 require_once __DIR__ . '/includes/csrf.php';
-if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
+kp_require_auth();
 
 $grades = ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12', 'Post-school'];
 $groups = kp_interest_groups();

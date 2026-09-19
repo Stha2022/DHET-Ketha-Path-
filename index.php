@@ -12,7 +12,7 @@
 <main class="auth-first-shell">
   <section class="auth-first-brand">
     <div class="logo-halo"></div>
-    <img class="auth-first-logo" src="assets/images/khetha-logo.png" alt="Khetha">
+    <div class="auth-brand-stack"><img class="auth-first-logo" src="assets/images/khetha-logo.png" alt="Khetha"><span class="auth-brand-divider"></span><img class="auth-first-gov" src="assets/images/dhet-official-logo.png" alt="Department of Higher Education and Training"></div>
     <p class="auth-first-tagline"><?= t('Make the right choice. Decide your future.') ?></p>
     <div class="journey-line">
       <span><?= t('Discover') ?></span><i></i><span><?= t('Decide') ?></span><i></i><span><?= t('Do') ?></span>

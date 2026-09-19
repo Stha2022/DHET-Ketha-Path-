@@ -50,12 +50,16 @@ function account_get(int $userId, ?mysqli $db = null): array {
  * $plainPassword is hashed immediately and never kept.
  */
 function account_set_credentials(int $userId, string $name, string $email, string $plainPassword): void {
+    $email = _account_normalise_email($email);
+    $hash = password_hash($plainPassword, PASSWORD_DEFAULT);
+    $db = kp_db();
+    if ($db && $userId > 0) {
+        [$first,$last] = _account_split_name($name);
+        $stmt = @$db->prepare('UPDATE users SET firstName=?,lastName=?,email=?,passwordHash=? WHERE userID=?');
+        if ($stmt) { $stmt->bind_param('ssssi',$first,$last,$email,$hash,$userId); $stmt->execute(); $stmt->close(); }
+    }
     _account_session();
-    $_SESSION[ACCOUNT_SESSION_KEY] = [
-        'name' => $name,
-        'email' => _account_normalise_email($email),
-        'hash' => password_hash($plainPassword, PASSWORD_DEFAULT),
-    ];
+    $_SESSION[ACCOUNT_SESSION_KEY] = ['name'=>$name,'email'=>$email,'hash'=>$hash];
     unset($_SESSION[ACCOUNT_THROTTLE_KEY]);
 }
 

@@ -13,7 +13,7 @@
  *      SELECT *), so passwordHash / tempToken / tempTokenExpiry / consentAt can never reach a CV.
  *   2. Otherwise the shared learner profile (includes/profile.php): demo mode.
  *   cv_db() returns a connection only when the environment variable KHETHA_USE_DB=1 is set, so
- *   demo mode never touches the database.
+ *   the app uses the configured database when available.
  *
  * STORAGE BOUNDARY (same rule as profile.php): the learner's CV edits live in the
  * learner_cv_edits table when the CV came from the database, and in $_SESSION['khetha_cv_edits']
@@ -38,7 +38,7 @@ const CV_DB_GRADES = ['grade 9' => 'Grade 9', 'grade 10' => 'Grade 10', 'grade 1
 // Connection
 // ---------------------------------------------------------------------------
 
-/** A live database connection, or null in demo mode (see includes/db.php). */
+/** A live database connection, or null only when the database is unavailable (see includes/db.php). */
 function cv_db(): ?mysqli {
     return kp_db();
 }
@@ -95,6 +95,21 @@ function _cv_read_db(mysqli $db, int $userId): ?array {
         'career_quiz' => ['code' => '', 'scores' => [], 'top_careers' => [], 'completed_at' => null],
         'intended_careers' => [], 'job_fit' => [],
     ];
+
+    // The current app stores the complete personalised journey in learner_profiles.
+    // Keep the assessmentResults history below for compatibility with earlier builds.
+    $profileRows = _cv_query($db, 'SELECT profileData FROM learner_profiles WHERE userID = ? LIMIT 1', 'i', [$userId]);
+    if ($profileRows) {
+        $saved = json_decode((string)$profileRows[0]['profileData'], true);
+        if (is_array($saved)) {
+            foreach (['home_language','fal','maths_track','subjects','marks','interests','intended_careers','job_fit'] as $k) {
+                if (array_key_exists($k, $saved)) $raw[$k] = is_array($saved[$k]) ? $saved[$k] : (string)$saved[$k];
+            }
+            if (!empty($saved['career_quiz']) && is_array($saved['career_quiz'])) $raw['career_quiz'] = array_replace($raw['career_quiz'], $saved['career_quiz']);
+            if (!empty($saved['grade'])) $raw['grade'] = (string)$saved['grade'];
+            if (!empty($saved['name'])) $raw['name'] = (string)$saved['name'];
+        }
+    }
 
     // Newest row first; the first row seen per source (per occupation for job_fit) wins.
     $results = _cv_query($db, 'SELECT source, payload, derived, createdAt FROM assessmentResults WHERE userID = ? ORDER BY assessmentID DESC LIMIT 300', 'i', [$userId]) ?: [];

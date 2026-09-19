@@ -1,10 +1,12 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/career-quiz-data.php';
 require_once __DIR__ . '/includes/profile.php';
+kp_require_auth();
 require_once __DIR__ . '/includes/matching.php';
 require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/journey.php';
 
 $dimensions = cq_dimensions();
 $items = cq_items();
@@ -38,6 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'top_careers' => array_column($matches, 'key'),
             'completed_at' => time(),
         ]]);
+        kp_record_assessment(kp_user_id(), 'career_choice', ['answers'=>$answersRaw], [
+            'code'=>$score['code'],'scores'=>array_map(fn($row) => $row['score'], $score['scores']),
+            'top_careers'=>array_column($matches,'key')
+        ]);
+        kp_log_event(kp_user_id(),'career_choice_completed',['code'=>$score['code']]);
 
         // Post/redirect/get, so refreshing the results never re-submits the quiz.
         header('Location: career-quiz.php?saved=1');

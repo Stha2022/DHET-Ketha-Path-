@@ -1,9 +1,11 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/job-fit-data.php';
 require_once __DIR__ . '/includes/profile.php';
+kp_require_auth();
 require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/journey.php';
 
 $occupations = kp_occupations();
 
@@ -36,12 +38,16 @@ if ($isSubmit) {
                 $detail = jf_score_occupation($parsed['answers'], $occupation);
                 $results = ['mode' => 'targeted', 'detail' => $detail];
                 profile_update(['job_fit' => [$occupation['id'] => $saveFit($detail, 'targeted')]]);
+                kp_record_assessment(kp_user_id(), 'job_fit', ['occupation_id'=>$occupation['id']], ['occupation_id'=>$occupation['id'],'overall'=>$detail['overall'],'flags'=>$detail['flags']]);
+                kp_log_event(kp_user_id(),'job_fit_completed',['occupation_id'=>$occupation['id']]);
             } else {
                 $matches = jf_match_occupations($parsed['answers']);
                 $results = ['mode' => 'broad', 'matches' => $matches];
                 $toSave = [];
                 foreach ($matches as $m) $toSave[$m['occupation_id']] = $saveFit($m, 'broad');
                 profile_update(['job_fit' => $toSave]);
+                foreach ($matches as $m) kp_record_assessment(kp_user_id(), 'job_fit', ['occupation_id'=>$m['occupation_id']], ['occupation_id'=>$m['occupation_id'],'overall'=>$m['overall'],'flags'=>$m['flags']]);
+                kp_log_event(kp_user_id(),'job_fit_completed',['mode'=>'broad','matches'=>count($matches)]);
             }
         }
     }

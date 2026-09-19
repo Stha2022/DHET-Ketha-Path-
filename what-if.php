@@ -1,9 +1,10 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 
 // Scenario copy is rendered client-side by assets/js/app.js, so it is
 // translated here and handed over as JSON.
+kp_require_auth();
 $scenarios = [
     'notqualify' => [
         'title'  => t('Your goal can have more than one route.'),
@@ -37,7 +38,7 @@ $i18n = ['scenarios' => $scenarios, 'explore' => t('Explore →')];
 <body>
 <div class="app-shell">
 <?php include __DIR__ . '/assets/navbar.php'; ?>
-<main class="dashboard narrow">
+<main id="main-content" class="dashboard narrow">
 <p class="eyebrow"><?= t('PATHWAY INTELLIGENCE') ?></p>
 <h1><?= t('What if my first route changes?') ?></h1>
 <p class="lead"><?= t('Real life doesn’t follow a straight line. Pick a scenario and Khetha will show how your pathway could adapt.') ?></p>

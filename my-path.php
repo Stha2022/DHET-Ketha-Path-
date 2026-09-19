@@ -1,11 +1,12 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/assets/lang.php';
 require_once __DIR__ . '/subject-data.php';
 require_once __DIR__ . '/includes/profile.php';
 require_once __DIR__ . '/includes/matching.php';
 
 // Everything on this page comes from the shared learner profile.
+kp_require_auth();
 $profile = profile_get();
 $name = $profile['name'] !== '' ? $profile['name'] : t('there');
 $grade = $profile['grade'];
@@ -70,7 +71,7 @@ $notSet = t('Not added yet');
 <div class="app-shell">
 <?php include __DIR__ . '/assets/navbar.php'; ?>
 
-<main class="dashboard">
+<main id="main-content" class="dashboard">
 <section class="welcome-row">
   <div><p class="eyebrow"><?= t('MY CAREER JOURNEY') ?></p><h1><?= t('Hi, {name}!', ['name' => $name]) ?> 👋</h1>
   <?php if ($grade !== ''): ?>
