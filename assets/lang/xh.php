@@ -457,4 +457,5 @@ return [
     'Building and fixing' => 'Ukwakha nokulungisa',
     'Exploring places' => 'Ukuphonononga iindawo',
     'Your session expired. Go back, refresh the page and try again.' => 'Iseshoni yakho iphelile. Buyela umva, uhlaziye iphepha uze uzame kwakhona.',
+    'We could not send your request right now. Please try again.' => 'Asikwazanga ukuthumela isicelo sakho ngoku. Nceda uzame kwakhona.',
 ];

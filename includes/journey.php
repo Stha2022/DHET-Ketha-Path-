@@ -19,6 +19,13 @@ function kp_record_assessment(int $userId,string $source,array $payload=[],array
     $stmt->bind_param('isss',$userId,$source,$p,$d);$ok=$stmt->execute();$stmt->close();return $ok;
 }
 
+function kp_save_advisor_request(int $userId, string $topic, string $note): bool {
+    $db = kp_db(); if (!$db || $userId <= 0) return false;
+    $stmt = @$db->prepare('INSERT INTO advisor_requests (userID,topic,note) VALUES (?,?,?)');
+    if (!$stmt) return false;
+    $stmt->bind_param('iss', $userId, $topic, $note); $ok = $stmt->execute(); $stmt->close(); return $ok;
+}
+
 function kp_notification_preferences(int $userId): array {
     $defaults = ['pushEnabled'=>false,'deadlineReminders'=>true,'assessmentReminders'=>true,'journeyTips'=>true];
     $db = kp_db();

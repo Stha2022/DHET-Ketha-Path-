@@ -9,7 +9,9 @@ if($_SERVER['REQUEST_METHOD']==='POST' && csrf_check($_POST['csrf']??'') && ($_P
   $type=trim((string)($_POST['item_type']??'career')); $id=trim((string)($_POST['item_id']??'')); $label=trim((string)($_POST['label']??$id));
   if(in_array($type,['career','qualification','provider'],true)&&$id!=='') kp_favourite_toggle($userId,$type,$id,$label);
   kp_log_event($userId,'favourite_toggled',['type'=>$type,'item_id'=>$id]);
-  header('Location: '.($_POST['back']??'favourites.php')); exit;
+  // Only ever back to a page in this app, never off-site.
+  $back=(string)($_POST['back']??''); $q=parse_url($back,PHP_URL_QUERY); $back=basename((string)parse_url($back,PHP_URL_PATH)).($q?'?'.$q:''); if(!preg_match('/^[a-z0-9-]+\.php(\?[\w=&.%-]*)?(#[\w-]*)?$/i',$back)) $back='favourites.php';
+  header('Location: '.$back); exit;
 }
 $n=profile_get()['name']?:t('Learner'); $rows=kp_favourites($userId);
 ?>

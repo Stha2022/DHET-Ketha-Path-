@@ -17,7 +17,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             if(!$u || !password_verify($password,(string)$u['passwordHash'])) $error=t('The email or password is incorrect.');
             else {
                 session_regenerate_id(true); $name=trim($u['firstName'].' '.$u['lastName']);
-                $_SESSION['user']=['id'=>(int)$u['userID'],'name'=>$name,'email'=>$u['email'],'grade'=>$u['grade']];
+                $_SESSION['user']=['id'=>(int)$u['userID'],'name'=>$name,'email'=>$u['email'],'grade'=>kp_grade_from_db((string)$u['grade'])];
                 profile_get(); kp_log_event((int)$u['userID'],'login',['source'=>'web']);
                 header('Location: dashboard.php'); exit;
             }

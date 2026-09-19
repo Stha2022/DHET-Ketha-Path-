@@ -1,10 +1,9 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/includes/journey.php';
 require_once __DIR__ . '/assets/lang.php';
-if (empty($_SESSION['user'])) {
-    header('Location: login.php');
-    exit;
-}
+kp_require_auth();
 
 $topics = [
     'subject_choice' => t('Subject Choice'),
@@ -22,13 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $note  = trim($_POST['note'] ?? '');
     $old   = ['topic' => $topic, 'note' => $note];
 
-    if (!array_key_exists($topic, $topics)) {
+    if (!csrf_check($_POST['csrf'] ?? '')) {
+        $errors['send'] = t('Your session expired. Refresh the page and try again.');
+    } elseif (!array_key_exists($topic, $topics)) {
         $errors['topic'] = t('Please choose a topic.');
     }
 
     if (empty($errors)) {
-        // Mocked — no real backend/advisor routing yet.
-        $sent = true;
+        // Saved for the advisor team; only confirm once it is actually stored.
+        $sent = kp_save_advisor_request(kp_user_id(), $topic, mb_substr($note, 0, 2000));
+        if ($sent) kp_log_event(kp_user_id(), 'advisor_request', ['topic' => $topic]);
+        else $errors['send'] = t('We could not send your request right now. Please try again.');
     }
 }
 ?>
@@ -48,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="welcome-row">
       <div>
         <h1><?= t('Contact a Career Advisor') ?></h1>
-        <p class="muted"><?= t('Send a request and a Career Advisor will follow up with you. This is a prototype flow — no request is actually sent yet.') ?></p>
+        <p class="muted"><?= t('Send a request and a Career Advisor will follow up with you.') ?></p>
       </div>
     </div>
 
@@ -63,6 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </section>
     <?php else: ?>
       <form class="wizard-panel" method="post" action="contact-advisor.php" style="max-width:560px">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(csrf_token()) ?>">
+        <?php if (!empty($errors['send'])): ?><div class="field-error" style="display:block"><?= $errors['send'] ?></div><?php endif; ?>
         <div class="q-block">
           <div class="mini-label"><?= t('What would you like to talk about?') ?></div>
           <select name="topic">

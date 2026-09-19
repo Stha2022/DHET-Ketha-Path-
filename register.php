@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                 $hash=password_hash($password,PASSWORD_DEFAULT);
                 $consentAt=date('Y-m-d H:i:s');
                 $stmt=$db->prepare('INSERT INTO users (firstName,lastName,email,passwordHash,grade,interests,consentAt) VALUES (?,?,?,?,?,?,?)');
-                $interests=json_encode($chips,JSON_UNESCAPED_UNICODE);
-                $stmt->bind_param('sssssss',$first,$last,$email,$hash,$grade,$interests,$consentAt);
+                $interests=json_encode($chips,JSON_UNESCAPED_UNICODE); $dbGrade=kp_grade_to_db($grade);
+                $stmt->bind_param('sssssss',$first,$last,$email,$hash,$dbGrade,$interests,$consentAt);
                 if(!$stmt->execute()) { $stmt->close(); throw new RuntimeException('Could not create account'); }
                 $userId=(int)$stmt->insert_id; $stmt->close();
                 session_regenerate_id(true);

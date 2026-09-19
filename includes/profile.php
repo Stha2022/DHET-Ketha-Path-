@@ -50,6 +50,19 @@ function profile_completion(): array {
     return ['percent' => (int)round(count($done) / count($steps) * 100), 'done' => $done, 'next' => $next, 'steps' => $steps];
 }
 
+// users.grade is an ENUM of lowercase values; the app uses the labels.
+const KP_DB_GRADES = ['Grade 9' => 'grade 9', 'Grade 10' => 'grade 10', 'Grade 11' => 'grade 11', 'Grade 12' => 'grade 12', 'Post-school' => 'out of school'];
+
+/** The users.grade value for an app grade label, or null if it has none. */
+function kp_grade_to_db(string $grade): ?string {
+    return KP_DB_GRADES[$grade] ?? (in_array(strtolower($grade), KP_DB_GRADES, true) ? strtolower($grade) : null);
+}
+
+/** The app grade label for a users.grade value. */
+function kp_grade_from_db(string $grade): string {
+    return array_search(strtolower($grade), KP_DB_GRADES, true) ?: $grade;
+}
+
 function _profile_load(): ?array {
     _profile_session();
     $id = (int)($_SESSION['user']['id'] ?? 0);
@@ -71,7 +84,7 @@ function _profile_load(): ?array {
                 $stmt->bind_param('i',$id);
                 if ($stmt->execute() && ($res=$stmt->get_result()) && ($u=$res->fetch_assoc())) {
                     $ints=json_decode((string)($u['interests']??''),true);
-                    return ['name'=>trim($u['firstName'].' '.$u['lastName']), 'grade'=>(string)($u['grade']??''), 'interests'=>is_array($ints)?$ints:[]];
+                    return ['name'=>trim($u['firstName'].' '.$u['lastName']), 'grade'=>kp_grade_from_db((string)($u['grade']??'')), 'interests'=>is_array($ints)?$ints:[]];
                 }
                 $stmt->close();
             }
@@ -101,11 +114,14 @@ function _profile_save(array $profile): void {
         $stmt->close();
     }
 
-    $grade = (string)($profile['grade'] ?? '');
+    $grade = kp_grade_to_db((string)($profile['grade'] ?? ''));
     $interests = json_encode(array_values((array)($profile['interests'] ?? [])), JSON_UNESCAPED_UNICODE);
-    $stmt = @$db->prepare('UPDATE users SET grade=?, interests=? WHERE userID=?');
+    // Grade only when it maps onto the ENUM; an unknown value would fail the whole update.
+    $stmt = $grade !== null
+        ? @$db->prepare('UPDATE users SET grade=?, interests=? WHERE userID=?')
+        : @$db->prepare('UPDATE users SET interests=? WHERE userID=?');
     if ($stmt) {
-        $stmt->bind_param('ssi', $grade, $interests, $id);
+        $grade !== null ? $stmt->bind_param('ssi', $grade, $interests, $id) : $stmt->bind_param('si', $interests, $id);
         $stmt->execute();
         $stmt->close();
     }

@@ -31,7 +31,7 @@ function kp_require_auth(): void {
             if ($stmt->execute() && ($res = $stmt->get_result()) && ($u = $res->fetch_assoc())) {
                 $_SESSION['user']['name'] = trim($u['firstName'].' '.$u['lastName']);
                 $_SESSION['user']['email'] = $u['email'];
-                $_SESSION['user']['grade'] = $u['grade'];
+                $_SESSION['user']['grade'] = kp_grade_from_db((string)$u['grade']);
             }
             $stmt->close();
         }
